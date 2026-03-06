@@ -191,3 +191,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## 📄 License
 
 MIT © [maim010](https://github.com/maim010)
+
+## 🙏 Sponsorship
+
+This project is sponsored by [zmto](https://zmto.com). Thank you for supporting open source!
