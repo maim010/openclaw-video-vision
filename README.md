@@ -3,11 +3,13 @@
 > **AI-powered video understanding** — Crawl any video platform, extract key frames, get structured summaries powered by vision AI.
 
 <p align="center">
+  <a href="https://github.com/maim010/openclaw-video-vision/stargazers"><img src="https://img.shields.io/github/stars/maim010/openclaw-video-vision?style=social" alt="GitHub Stars"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://clawhub.com"><img src="https://img.shields.io/badge/OpenClaw-Skill-orange" alt="OpenClaw Skill"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D18-green" alt="Node.js"></a>
   <a href="https://playwright.dev"><img src="https://img.shields.io/badge/Playwright--Core-Chromium-2EAD33" alt="Playwright"></a>
   <a href="https://ffmpeg.org"><img src="https://img.shields.io/badge/FFmpeg-required-blue" alt="FFmpeg"></a>
+  <a href="https://maim010.github.io/openclaw-video-vision/"><img src="https://img.shields.io/badge/Docs-VitePress-646CFF" alt="Documentation"></a>
 </p>
 
 <p align="center">
@@ -15,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="./README_CN.md">📖 中文文档</a>
+  <a href="https://maim010.github.io/openclaw-video-vision/">📖 Documentation</a> · <a href="https://maim010.github.io/openclaw-video-vision/zh/">📖 中文文档</a>
 </p>
 
 ---
