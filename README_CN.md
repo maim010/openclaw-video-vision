@@ -1,7 +1,4 @@
-<p align="center">
-  <a href="./README.md">📖 English</a>
-</p>
-
+<a href="./README.md">📖 English</a>
 # 🎬 openclaw-video-vision
 
 > **AI 驱动的视频理解工具** — 爬取任意视频平台，提取关键帧，通过视觉 AI 生成结构化摘要。
