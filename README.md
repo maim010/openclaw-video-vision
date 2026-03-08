@@ -107,8 +107,8 @@
 ### Install
 
 ```bash
-git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skills/video-vision
-cd ~/.openclaw/skills/video-vision
+git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
+cd ~/.openclaw/workspace/skills/video-vision
 npm install
 
 # Only needed for local browser mode (not needed for cloud browsers)
@@ -117,6 +117,20 @@ npx playwright-core install chromium
 # Recommended: install yt-dlp for best video URL extraction
 # macOS: brew install yt-dlp
 # pip:   pip install yt-dlp
+```
+
+Then enable the skill in `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "skills": {
+    "entries": {
+      "video-vision": {
+        "enabled": true
+      }
+    }
+  }
+}
 ```
 
 ### Run
@@ -265,16 +279,13 @@ For authenticated / age-restricted content, provide cookie files. See the full [
 
 ```
 openclaw-video-vision/
+├── SKILL.md                 # OpenClaw skill manifest (name + description + instructions)
 ├── src/
 │   └── index.js              # Core: yt-dlp, crawler, frame extractor, vision client
-├── skills/
-│   └── video-vision/
-│       └── SKILL.md          # OpenClaw skill manifest
 ├── examples/
 │   ├── youtube_example.js    # YouTube usage demo
 │   └── bilibili_example.js   # Bilibili usage demo
-├── docs/
-│   └── cookie-setup.md       # Cookie export & config guide
+├── docs/                     # VitePress documentation (EN + 中文)
 ├── package.json
 ├── CONTRIBUTING.md
 ├── LICENSE

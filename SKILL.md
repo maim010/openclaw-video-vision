@@ -1,13 +1,11 @@
 ---
 name: video-vision
-description: Crawl YouTube, Bilibili and other video platforms using Playwright, extract key frames, and summarize visual content using vision AI models. Supports proxy IPs and account cookies for authenticated access.
-homepage: https://github.com/maim010/openclaw-video-vision
-metadata: {"openclaw":{"emoji":"🎬","requires":{"bins":["node","ffmpeg"],"env":["VIDEO_VISION_API_KEY"],"config":[]},"install":[{"type":"node","pkg":"playwright-core"},{"type":"download","url":"https://github.com/maim010/openclaw-video-vision/releases/latest/download/video-vision-skill.tar.gz","archive":"tar.gz"}]}}
+description: Crawl YouTube, Bilibili and other video platforms, extract key frames, and summarize visual content using vision AI models. Supports proxy IPs and account cookies for authenticated access.
 ---
 
 # video-vision — Video Frame Extraction & AI Summarization Skill
 
-This skill enables OpenClaw to browse video platforms (YouTube, Bilibili, and others) using Playwright,
+This skill enables OpenClaw to browse video platforms (YouTube, Bilibili, and others),
 extract key frames from videos, and use vision AI models to generate summaries of video content.
 
 ## When to Use This Skill
@@ -27,12 +25,12 @@ Use this skill when the user asks to:
 - **Generic video pages** (any page with an embeddable or downloadable video)
 
 ### Core Features
-1. **Browser-based crawling** via Playwright (Chromium headless, local or cloud)
-2. **Frame extraction** using FFmpeg — configurable interval (e.g., 1 frame every 5s)
-3. **Vision AI summarization** — sends frames to a configurable vision model endpoint (any OpenAI-compatible API)
-4. **Proxy support** — HTTP/HTTPS/SOCKS5 proxies configurable per-request
-5. **Cookie injection** — supports Netscape/JSON format cookie files for authenticated sessions
-6. **yt-dlp integration** — preferred path for extracting video URLs without a browser (optional)
+1. **yt-dlp integration** — preferred path for extracting video URLs without a browser
+2. **Browser-based crawling** via Playwright (Chromium headless, local or cloud)
+3. **Frame extraction** using FFmpeg — configurable interval (e.g., 1 frame every 5s)
+4. **Vision AI summarization** — sends frames to a configurable vision model endpoint (any OpenAI-compatible API)
+5. **Proxy support** — HTTP/HTTPS/SOCKS5 proxies configurable per-request
+6. **Cookie injection** — supports Netscape/JSON format cookie files for authenticated sessions
 7. **Cloud browser support** — Browserless, Browserbase, Steel for environments without local Chromium
 
 ---
@@ -48,9 +46,9 @@ Or:
 > "What is this Bilibili video about? https://www.bilibili.com/video/BVXXXXX"
 
 OpenClaw will:
-1. Open the video URL in a headless browser
-2. Wait for the player to load and extract video metadata
-3. Download/stream and extract frames at regular intervals
+1. Try yt-dlp to get video metadata and direct URL
+2. Extract frames at regular intervals via FFmpeg
+3. If yt-dlp fails, fall back to Playwright browser
 4. Send frames to the vision model
 5. Return a structured summary with timestamps
 
@@ -58,17 +56,11 @@ OpenClaw will:
 
 > "Summarize this video using proxy 127.0.0.1:7890"
 
-Or configure a default proxy in your skill config (see Configuration below).
-
 ### With Cookies (Authenticated Content)
 
 > "Summarize this private Bilibili video, use my cookies file at ~/bilibili_cookies.json"
 
 Cookie files must be in **Netscape** format or **JSON** (array of `{name, value, domain, path}` objects).
-
-### Batch Processing
-
-> "Summarize all videos in this YouTube playlist: https://youtube.com/playlist?list=XXXXX"
 
 ---
 
@@ -79,20 +71,15 @@ Set these environment variables or configure via `~/.openclaw/openclaw.json`:
 ```json
 {
   "skills": {
-    "entries": [
-      {
-        "name": "video-vision",
+    "entries": {
+      "video-vision": {
+        "enabled": true,
         "env": {
-          "VIDEO_VISION_API_KEY": "your-vision-model-api-key",
-          "VIDEO_VISION_API_URL": "https://api.openai.com/v1/chat/completions",
-          "VIDEO_VISION_MODEL": "gpt-4o",
-          "VIDEO_VISION_PROXY": "http://127.0.0.1:7890",
-          "VIDEO_VISION_FRAME_INTERVAL": "5",
-          "VIDEO_VISION_MAX_FRAMES": "20",
-          "VIDEO_VISION_COOKIES_DIR": "~/.openclaw/cookies"
+          "VIDEO_VISION_API_KEY": "sk-...",
+          "VIDEO_VISION_MODEL": "gpt-4o"
         }
       }
-    ]
+    }
   }
 }
 ```
@@ -104,10 +91,12 @@ Set these environment variables or configure via `~/.openclaw/openclaw.json`:
 | `VIDEO_VISION_API_KEY` | *required* | Vision model API key |
 | `VIDEO_VISION_API_URL` | OpenAI endpoint | Custom vision API endpoint |
 | `VIDEO_VISION_MODEL` | `gpt-4o` | Vision model to use |
+| `VIDEO_VISION_MODE` | `auto` | `auto` / `ytdlp` / `browser` |
 | `VIDEO_VISION_PROXY` | none | Default HTTP/SOCKS5 proxy |
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | Seconds between extracted frames |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | Max frames per video |
 | `VIDEO_VISION_COOKIES_DIR` | none | Directory with per-domain cookie files |
+| `VIDEO_VISION_BROWSER` | `local` | `local` / `browserless` / `browserbase` / `steel` |
 
 ---
 
@@ -116,19 +105,19 @@ Set these environment variables or configure via `~/.openclaw/openclaw.json`:
 The skill returns a structured summary like:
 
 ```
-🎬 Video Summary: [Title]
-📺 Platform: YouTube | Duration: 12:34
-👁️ Frames analyzed: 18
+Video Summary: [Title]
+Platform: YouTube | Duration: 12:34
+Frames analyzed: 18
 
-📝 Summary:
+Summary:
 This video covers [main topic]...
 
-⏱️ Key Moments:
+Key Moments:
 - 0:30 — [description of what's visible]
 - 2:15 — [description]
 - 5:00 — [description]
 
-🏷️ Topics detected: [tag1], [tag2], [tag3]
+Topics detected: [tag1], [tag2], [tag3]
 ```
 
 ---
@@ -140,26 +129,37 @@ This video covers [main topic]...
 - **Very long videos**: The skill automatically samples frames evenly across the duration, capped at `VIDEO_VISION_MAX_FRAMES`.
 - **Live streams**: Only the currently buffered segment is analyzed; live streams are flagged in output.
 - **Unavailable videos**: Returns a clear error message with the reason (private, deleted, region-blocked).
+- **Android / PRoot / Termux**: Playwright unavailable — set `VIDEO_VISION_MODE=ytdlp` to use yt-dlp + FFmpeg only.
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skills/video-vision
-cd ~/.openclaw/skills/video-vision
+git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
+cd ~/.openclaw/workspace/skills/video-vision
 npm install
 
-# Install Playwright browsers (only needed for local browser mode)
+# Recommended: install yt-dlp and ffmpeg
+# macOS: brew install yt-dlp ffmpeg
+# Linux: apt install ffmpeg && pip install yt-dlp
+
+# (Optional) Install Chromium for browser mode
 npx playwright-core install chromium
+```
 
-# Recommended: install yt-dlp for best video URL extraction
-# macOS: brew install yt-dlp
-# pip:   pip install yt-dlp
+Then add to `~/.openclaw/openclaw.json`:
 
-# Make sure ffmpeg is installed
-# macOS: brew install ffmpeg
-# Ubuntu/Debian: sudo apt install ffmpeg
+```json
+{
+  "skills": {
+    "entries": {
+      "video-vision": {
+        "enabled": true
+      }
+    }
+  }
+}
 ```
 
 ---

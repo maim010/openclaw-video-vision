@@ -99,8 +99,8 @@
 ### 安装
 
 ```bash
-git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skills/video-vision
-cd ~/.openclaw/skills/video-vision
+git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
+cd ~/.openclaw/workspace/skills/video-vision
 npm install
 
 # 仅本地浏览器模式需要（使用云浏览器时无需）
@@ -109,6 +109,20 @@ npx playwright-core install chromium
 # 推荐：安装 yt-dlp 以获得最佳视频 URL 提取效果
 # macOS: brew install yt-dlp
 # pip:   pip install yt-dlp
+```
+
+然后在 `~/.openclaw/openclaw.json` 中启用技能：
+
+```json
+{
+  "skills": {
+    "entries": {
+      "video-vision": {
+        "enabled": true
+      }
+    }
+  }
+}
 ```
 
 ### 运行

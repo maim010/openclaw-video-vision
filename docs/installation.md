@@ -17,8 +17,8 @@
 
 ```bash
 # Clone
-git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skills/video-vision
-cd ~/.openclaw/skills/video-vision
+git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
+cd ~/.openclaw/workspace/skills/video-vision
 
 # Install Node dependencies
 npm install
