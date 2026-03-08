@@ -26,6 +26,8 @@ const CONFIG = {
   cookiesDir: process.env.VIDEO_VISION_COOKIES_DIR
     ? path.resolve(process.env.VIDEO_VISION_COOKIES_DIR.replace('~', os.homedir()))
     : null,
+  // Extraction mode: 'auto' (default) | 'ytdlp' | 'browser'
+  mode: (process.env.VIDEO_VISION_MODE || 'auto').toLowerCase(),
   // Cloud browser settings
   browser: (process.env.VIDEO_VISION_BROWSER || 'local').toLowerCase(),
   browserlessToken: process.env.VIDEO_VISION_BROWSERLESS_TOKEN || '',
@@ -117,6 +119,31 @@ function getVideoWithYtDlp(url, { proxy = null, cookieFile = null } = {}) {
       } catch (_) {
         resolve(null);
       }
+    });
+  });
+}
+
+// ─── yt-dlp download to local file (fallback when direct URL fails) ─────────
+function downloadWithYtDlp(url, outputPath, { proxy = null, cookieFile = null } = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-f', 'best[height<=480][ext=mp4]/best[ext=mp4]/best',
+      '-o', outputPath,
+      '--no-playlist',
+      url,
+    ];
+
+    const proxyStr = proxy || CONFIG.proxy;
+    if (proxyStr) args.push('--proxy', proxyStr);
+    if (cookieFile) {
+      const resolved = path.resolve(cookieFile.replace('~', os.homedir()));
+      if (fs.existsSync(resolved)) args.push('--cookies', resolved);
+    }
+
+    execFile('yt-dlp', args, { timeout: 300000, maxBuffer: 1024 * 1024 }, (err) => {
+      if (err) return reject(err);
+      if (!fs.existsSync(outputPath)) return reject(new Error('yt-dlp download produced no file'));
+      resolve(outputPath);
     });
   });
 }
@@ -496,44 +523,76 @@ async function run({ url, proxy = null, cookieFile = null }) {
   const platform = detectPlatform(url);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'video-vision-'));
   const framesDir = path.join(tmpDir, 'frames');
+  const mode = CONFIG.mode; // 'auto' | 'ytdlp' | 'browser'
 
   try {
-    // ── Phase 1: Try yt-dlp first (no browser needed) ──────────────────────
-    const ytdlpInfo = await getVideoWithYtDlp(url, { proxy, cookieFile });
+    let ytdlpInfo = null;
 
-    if (ytdlpInfo && ytdlpInfo.videoUrl) {
-      try {
-        // Build headers for FFmpeg (e.g. Bilibili needs Referer)
-        const ffmpegHeaders = {};
-        if (ytdlpInfo.httpHeaders) {
-          if (ytdlpInfo.httpHeaders.Referer) ffmpegHeaders.Referer = ytdlpInfo.httpHeaders.Referer;
-          if (ytdlpInfo.httpHeaders['User-Agent']) ffmpegHeaders['User-Agent'] = ytdlpInfo.httpHeaders['User-Agent'];
+    // ── Phase 1: yt-dlp + FFmpeg (skipped when mode === 'browser') ────────
+    if (mode !== 'browser') {
+      ytdlpInfo = await getVideoWithYtDlp(url, { proxy, cookieFile });
+
+      if (ytdlpInfo) {
+        let frameInfo = null;
+
+        // Step 1a: Try FFmpeg with direct URL
+        if (ytdlpInfo.videoUrl) {
+          try {
+            const ffmpegHeaders = {};
+            if (ytdlpInfo.httpHeaders) {
+              if (ytdlpInfo.httpHeaders.Referer) ffmpegHeaders.Referer = ytdlpInfo.httpHeaders.Referer;
+              if (ytdlpInfo.httpHeaders['User-Agent']) ffmpegHeaders['User-Agent'] = ytdlpInfo.httpHeaders['User-Agent'];
+            }
+            if (platform === 'bilibili' && !ffmpegHeaders.Referer) {
+              ffmpegHeaders.Referer = 'https://www.bilibili.com/';
+            }
+
+            frameInfo = await extractFrames(
+              ytdlpInfo.videoUrl,
+              ytdlpInfo.durationSecs || ytdlpInfo.duration,
+              framesDir,
+              ffmpegHeaders,
+            );
+            if (frameInfo.frames.length === 0) frameInfo = null;
+          } catch (_) {
+            frameInfo = null;
+          }
         }
-        // Bilibili: always ensure Referer is set
-        if (platform === 'bilibili' && !ffmpegHeaders.Referer) {
-          ffmpegHeaders.Referer = 'https://www.bilibili.com/';
+
+        // Step 1b: Direct URL failed (403 etc.) — download via yt-dlp then extract
+        if (!frameInfo) {
+          try {
+            const localVideo = path.join(tmpDir, 'video.mp4');
+            await downloadWithYtDlp(url, localVideo, { proxy, cookieFile });
+            frameInfo = await extractFrames(
+              localVideo,
+              ytdlpInfo.durationSecs || ytdlpInfo.duration,
+              framesDir,
+            );
+            if (frameInfo.frames.length === 0) frameInfo = null;
+          } catch (_) {
+            frameInfo = null;
+          }
         }
 
-        const frameInfo = await extractFrames(
-          ytdlpInfo.videoUrl,
-          ytdlpInfo.durationSecs || ytdlpInfo.duration,
-          framesDir,
-          ffmpegHeaders,
-        );
-
-        if (frameInfo.frames.length > 0) {
+        if (frameInfo && frameInfo.frames.length > 0) {
           const visionResult = await analyzeFramesWithVision(
             frameInfo.frames, ytdlpInfo.title, ytdlpInfo.description
           );
           const meta = { title: ytdlpInfo.title, duration: ytdlpInfo.duration, description: ytdlpInfo.description };
           return formatResult(url, platform, meta, frameInfo.frames.length, frameInfo.adjustedInterval, visionResult);
         }
-      } catch (_) {
-        // FFmpeg failed with yt-dlp URL, fall through to Phase 2
+      }
+
+      // yt-dlp mode: do not fall through to browser
+      if (mode === 'ytdlp') {
+        throw new Error(
+          'yt-dlp + FFmpeg failed to extract frames and VIDEO_VISION_MODE is set to "ytdlp" (no browser fallback).'
+        );
       }
     }
 
-    // ── Phase 2: Browser fallback ──────────────────────────────────────────
+    // ── Phase 2: Browser fallback (skipped when mode === 'ytdlp') ─────────
     const cookies = loadCookies(platform, cookieFile);
     let browser, page;
 
@@ -607,4 +666,4 @@ if (require.main === module) {
     .catch(err => { console.error('Error:', err.message); process.exit(1); });
 }
 
-module.exports = { run, detectPlatform, loadCookies, getVideoWithYtDlp };
+module.exports = { run, detectPlatform, loadCookies, getVideoWithYtDlp, downloadWithYtDlp };

@@ -205,6 +205,7 @@ Set environment variables or add to `~/.openclaw/openclaw.json`:
 | `VIDEO_VISION_API_KEY` | *required* | Vision model API key |
 | `VIDEO_VISION_API_URL` | `https://api.openai.com/v1/chat/completions` | Any OpenAI-compatible vision endpoint |
 | `VIDEO_VISION_MODEL` | `gpt-4o` | Vision model to use |
+| `VIDEO_VISION_MODE` | `auto` | Extraction mode: `auto` (try yt-dlp first, fall back to browser) / `ytdlp` (yt-dlp + FFmpeg only, no browser) / `browser` (browser only, skip yt-dlp) |
 | `VIDEO_VISION_PROXY` | — | Default proxy URL |
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | Seconds between frames |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | Max frames per video |

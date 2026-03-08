@@ -202,6 +202,7 @@ node src/index.js https://youtube.com/watch?v=XXXXX --cookies=~/youtube_cookies.
 | `VIDEO_VISION_API_KEY` | *必填* | 视觉模型 API Key |
 | `VIDEO_VISION_API_URL` | `https://api.openai.com/v1/chat/completions` | 任意 OpenAI 兼容的视觉端点 |
 | `VIDEO_VISION_MODEL` | `gpt-4o` | 使用的视觉模型 |
+| `VIDEO_VISION_MODE` | `auto` | 提取模式：`auto`（先 yt-dlp，失败回退浏览器）/ `ytdlp`（仅 yt-dlp + FFmpeg，不启动浏览器）/ `browser`（仅浏览器，跳过 yt-dlp） |
 | `VIDEO_VISION_PROXY` | — | 默认代理地址 |
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | 抽帧间隔（秒） |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | 每个视频最大帧数 |
