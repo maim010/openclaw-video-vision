@@ -9,11 +9,11 @@ All settings are controlled via environment variables or `~/.openclaw/openclaw.j
 | `VIDEO_VISION_API_KEY` | *required* | Vision model API key |
 | `VIDEO_VISION_API_URL` | `https://api.openai.com/v1/chat/completions` | Any OpenAI-compatible vision endpoint |
 | `VIDEO_VISION_MODEL` | `gpt-4o` | Vision model to use |
-| `VIDEO_VISION_MODE` | `auto` | Extraction mode: `auto` / `ytdlp` / `browser` (see [[Extraction-Modes]]) |
+| `VIDEO_VISION_MODE` | `auto` | Extraction mode: `auto` / `ytdlp` / `browser` (see [Extraction Modes](./extraction-modes.md)) |
 | `VIDEO_VISION_PROXY` | — | Default proxy URL (HTTP/HTTPS/SOCKS5) |
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | Seconds between extracted frames |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | Maximum frames per video |
-| `VIDEO_VISION_COOKIES_DIR` | — | Directory containing cookie files (see [[Cookies]]) |
+| `VIDEO_VISION_COOKIES_DIR` | — | Directory containing cookie files (see [Cookies](./cookies.md)) |
 | `VIDEO_VISION_BROWSER` | `local` | Browser backend: `local` / `browserless` / `browserbase` / `steel` |
 | `VIDEO_VISION_BROWSERLESS_TOKEN` | — | Browserless API token |
 | `VIDEO_VISION_BROWSERBASE_API_KEY` | — | Browserbase API key |

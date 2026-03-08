@@ -24,3 +24,7 @@ frames_output/
 *_cookies.json
 *_cookies.txt
 !examples/*_cookies_example.json
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/

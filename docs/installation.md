@@ -54,7 +54,7 @@ export VIDEO_VISION_MODE=ytdlp
 
 No local Chromium available. Either:
 - Use `VIDEO_VISION_MODE=ytdlp` (if yt-dlp + FFmpeg are available), or
-- Use a cloud browser: set `VIDEO_VISION_BROWSER=browserless|browserbase|steel` (see [[Cloud-Browsers]])
+- Use a cloud browser: set `VIDEO_VISION_BROWSER=browserless|browserbase|steel` (see [Cloud Browsers](./cloud-browsers.md))
 
 ### macOS / Linux / Windows (Desktop)
 
