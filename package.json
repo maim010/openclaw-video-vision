@@ -41,6 +41,6 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "playwright": "^1.42.0"
+    "playwright-core": "^1.42.0"
   }
 }

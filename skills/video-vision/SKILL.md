@@ -2,7 +2,7 @@
 name: video-vision
 description: Crawl YouTube, Bilibili and other video platforms using Playwright, extract key frames, and summarize visual content using vision AI models. Supports proxy IPs and account cookies for authenticated access.
 homepage: https://github.com/maim010/openclaw-video-vision
-metadata: {"openclaw":{"emoji":"🎬","requires":{"bins":["node","ffmpeg"],"env":["VIDEO_VISION_API_KEY"],"config":[]},"install":[{"type":"node","pkg":"playwright"},{"type":"download","url":"https://github.com/maim010/openclaw-video-vision/releases/latest/download/video-vision-skill.tar.gz","archive":"tar.gz"}]}}
+metadata: {"openclaw":{"emoji":"🎬","requires":{"bins":["node","ffmpeg"],"env":["VIDEO_VISION_API_KEY"],"config":[]},"install":[{"type":"node","pkg":"playwright-core"},{"type":"download","url":"https://github.com/maim010/openclaw-video-vision/releases/latest/download/video-vision-skill.tar.gz","archive":"tar.gz"}]}}
 ---
 
 # video-vision — Video Frame Extraction & AI Summarization Skill
@@ -27,11 +27,13 @@ Use this skill when the user asks to:
 - **Generic video pages** (any page with an embeddable or downloadable video)
 
 ### Core Features
-1. **Browser-based crawling** via Playwright (Chromium headless)
+1. **Browser-based crawling** via Playwright (Chromium headless, local or cloud)
 2. **Frame extraction** using FFmpeg — configurable interval (e.g., 1 frame every 5s)
-3. **Vision AI summarization** — sends frames to a configurable vision model endpoint
+3. **Vision AI summarization** — sends frames to a configurable vision model endpoint (any OpenAI-compatible API)
 4. **Proxy support** — HTTP/HTTPS/SOCKS5 proxies configurable per-request
 5. **Cookie injection** — supports Netscape/JSON format cookie files for authenticated sessions
+6. **yt-dlp integration** — preferred path for extracting video URLs without a browser (optional)
+7. **Cloud browser support** — Browserless, Browserbase, Steel for environments without local Chromium
 
 ---
 
@@ -148,8 +150,12 @@ git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skill
 cd ~/.openclaw/skills/video-vision
 npm install
 
-# Install Playwright browsers
-npx playwright install chromium
+# Install Playwright browsers (only needed for local browser mode)
+npx playwright-core install chromium
+
+# Recommended: install yt-dlp for best video URL extraction
+# macOS: brew install yt-dlp
+# pip:   pip install yt-dlp
 
 # Make sure ffmpeg is installed
 # macOS: brew install ffmpeg

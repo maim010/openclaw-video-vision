@@ -8,8 +8,8 @@
  * License: MIT
  */
 
-const { chromium } = require('playwright');
-const { execSync, spawn } = require('child_process');
+const { chromium } = require('playwright-core');
+const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -27,6 +27,12 @@ const CONFIG = {
   cookiesDir: process.env.VIDEO_VISION_COOKIES_DIR
     ? path.resolve(process.env.VIDEO_VISION_COOKIES_DIR.replace('~', os.homedir()))
     : null,
+  // Cloud browser settings
+  browser: (process.env.VIDEO_VISION_BROWSER || 'local').toLowerCase(),
+  browserlessToken: process.env.VIDEO_VISION_BROWSERLESS_TOKEN || '',
+  browserbaseApiKey: process.env.VIDEO_VISION_BROWSERBASE_API_KEY || '',
+  browserbaseProjectId: process.env.VIDEO_VISION_BROWSERBASE_PROJECT_ID || '',
+  steelApiKey: process.env.VIDEO_VISION_STEEL_API_KEY || '',
 };
 
 // ─── Platform detection ───────────────────────────────────────────────────────
@@ -81,8 +87,93 @@ function loadCookies(platform, cookieFile = null) {
     .filter(Boolean);
 }
 
-// ─── Browser launcher ─────────────────────────────────────────────────────────
+// ─── yt-dlp integration (optional) ───────────────────────────────────────────
+function getVideoWithYtDlp(url, { proxy = null, cookieFile = null } = {}) {
+  return new Promise(resolve => {
+    const args = [
+      '-j', '--no-download',
+      '-f', 'best[height<=480][ext=mp4]/best[ext=mp4]/best',
+      url,
+    ];
+
+    const proxyStr = proxy || CONFIG.proxy;
+    if (proxyStr) args.push('--proxy', proxyStr);
+    if (cookieFile) {
+      const resolved = path.resolve(cookieFile.replace('~', os.homedir()));
+      if (fs.existsSync(resolved)) args.push('--cookies', resolved);
+    }
+
+    execFile('yt-dlp', args, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout) => {
+      if (err || !stdout) return resolve(null);
+      try {
+        const info = JSON.parse(stdout);
+        resolve({
+          title: info.title || info.fulltitle || 'Unknown',
+          duration: info.duration ? formatSeconds(info.duration) : 'unknown',
+          durationSecs: info.duration || 0,
+          description: (info.description || '').slice(0, 500),
+          videoUrl: info.url || null,
+          httpHeaders: info.http_headers || {},
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  });
+}
+
+// ─── Browser launcher — supports local + cloud browsers ──────────────────────
 async function launchBrowser(proxy = null) {
+  const mode = CONFIG.browser;
+
+  if (mode === 'browserless') {
+    if (!CONFIG.browserlessToken) throw new Error('VIDEO_VISION_BROWSERLESS_TOKEN is not set.');
+    const wsUrl = `wss://production-sfo.browserless.io?token=${CONFIG.browserlessToken}`;
+    return chromium.connectOverCDP(wsUrl);
+  }
+
+  if (mode === 'browserbase') {
+    if (!CONFIG.browserbaseApiKey) throw new Error('VIDEO_VISION_BROWSERBASE_API_KEY is not set.');
+    if (!CONFIG.browserbaseProjectId) throw new Error('VIDEO_VISION_BROWSERBASE_PROJECT_ID is not set.');
+
+    // Create a session via REST API
+    const sessionData = await new Promise((resolve, reject) => {
+      const body = JSON.stringify({ projectId: CONFIG.browserbaseProjectId });
+      const req = https.request(
+        {
+          hostname: 'www.browserbase.com',
+          path: '/v1/sessions',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-bb-api-key': CONFIG.browserbaseApiKey,
+            'Content-Length': Buffer.byteLength(body),
+          },
+        },
+        res => {
+          let data = '';
+          res.on('data', c => { data += c; });
+          res.on('end', () => {
+            try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+          });
+        }
+      );
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+
+    const connectUrl = `wss://connect.browserbase.com?apiKey=${CONFIG.browserbaseApiKey}&sessionId=${sessionData.id}`;
+    return chromium.connectOverCDP(connectUrl);
+  }
+
+  if (mode === 'steel') {
+    if (!CONFIG.steelApiKey) throw new Error('VIDEO_VISION_STEEL_API_KEY is not set.');
+    const wsUrl = `wss://connect.steel.dev?apiKey=${CONFIG.steelApiKey}`;
+    return chromium.connectOverCDP(wsUrl);
+  }
+
+  // local mode (default)
   const launchOptions = {
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -119,14 +210,7 @@ async function scrapeYouTube(page, url) {
       document.querySelector('#description-inline-expander yt-attributed-string')?.textContent?.slice(0, 500) ||
       document.querySelector('meta[name="description"]')?.content?.slice(0, 500) || '';
 
-    // Try to get direct video URL from ytInitialPlayerResponse
-    let videoUrl = null;
-    try {
-      const match = document.documentElement.innerHTML.match(/"url":"(https:\/\/[^"]*mime=video[^"]*)"/);
-      if (match) videoUrl = match[1].replace(/\\u0026/g, '&');
-    } catch (_) {}
-
-    return { title, duration, description, videoUrl };
+    return { title, duration, description, videoUrl: null };
   });
 
   return meta;
@@ -173,8 +257,8 @@ async function scrapeGeneric(page, url) {
 }
 
 // ─── Frame extractor via FFmpeg ───────────────────────────────────────────────
-async function extractFrames(videoUrl, duration, outputDir) {
-  const durationSecs = parseDuration(duration);
+async function extractFrames(videoUrl, duration, outputDir, headers = {}) {
+  const durationSecs = typeof duration === 'number' ? duration : parseDuration(duration);
   const interval = CONFIG.frameInterval;
   const maxFrames = CONFIG.maxFrames;
 
@@ -187,14 +271,23 @@ async function extractFrames(videoUrl, duration, outputDir) {
   const outputPattern = path.join(outputDir, 'frame_%04d.jpg');
 
   return new Promise((resolve, reject) => {
-    const args = [
+    const args = [];
+
+    // Build -headers argument (must come before -i)
+    const headerEntries = Object.entries(headers);
+    if (headerEntries.length > 0) {
+      const headerStr = headerEntries.map(([k, v]) => `${k}: ${v}\r\n`).join('');
+      args.push('-headers', headerStr);
+    }
+
+    args.push(
       '-i', videoUrl,
       '-vf', `fps=1/${adjustedInterval}`,
       '-vframes', String(maxFrames),
       '-q:v', '2',
       outputPattern,
       '-y',
-    ];
+    );
 
     const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
@@ -220,22 +313,45 @@ async function captureScreenshots(page, platform, outputDir) {
   fs.mkdirSync(outputDir, { recursive: true });
   const frames = [];
 
-  // Seek to various positions and screenshot
+  // Step 1: Click play button to start video (avoid black-screen captures)
+  try {
+    if (platform === 'youtube') {
+      const playBtn = page.locator('.ytp-play-button');
+      if (await playBtn.count() > 0) await playBtn.click().catch(() => {});
+    } else if (platform === 'bilibili') {
+      const playBtn = page.locator('.bpx-player-ctrl-play');
+      if (await playBtn.count() > 0) await playBtn.click().catch(() => {});
+    } else {
+      // Generic: try clicking the video element itself
+      const videoEl = page.locator('video');
+      if (await videoEl.count() > 0) await videoEl.click().catch(() => {});
+    }
+
+    // Wait for video to actually start playing
+    await page.waitForFunction(
+      () => {
+        const v = document.querySelector('video');
+        return v && v.currentTime > 0 && !v.paused;
+      },
+      { timeout: 5000 }
+    ).catch(() => {});
+  } catch (_) {}
+
+  // Step 2: Seek to various positions and screenshot
   const positions = [0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9];
-  const selector = platform === 'bilibili' ? 'video' : 'video';
 
   for (let i = 0; i < positions.length; i++) {
     try {
       await page.evaluate(
-        ({ sel, pos }) => {
-          const v = document.querySelector(sel);
+        ({ pos }) => {
+          const v = document.querySelector('video');
           if (v && v.duration) v.currentTime = v.duration * pos;
         },
-        { sel: selector, pos: positions[i] }
+        { pos: positions[i] }
       );
       await page.waitForTimeout(800);
       const framePath = path.join(outputDir, `frame_${String(i + 1).padStart(4, '0')}.jpg`);
-      await page.locator(selector).screenshot({ path: framePath, type: 'jpeg', quality: 80 });
+      await page.locator('video').screenshot({ path: framePath, type: 'jpeg', quality: 80 });
       frames.push(framePath);
     } catch (_) {}
   }
@@ -354,6 +470,14 @@ function parseDuration(str) {
   return parseInt(str, 10) || 0;
 }
 
+function formatSeconds(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = Math.floor(secs % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function cleanupDir(dir) {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
 }
@@ -361,51 +485,98 @@ function cleanupDir(dir) {
 // ─── Main entry point ─────────────────────────────────────────────────────────
 async function run({ url, proxy = null, cookieFile = null }) {
   const platform = detectPlatform(url);
-  const cookies = loadCookies(platform, cookieFile);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'video-vision-'));
-
-  let browser, page;
+  const framesDir = path.join(tmpDir, 'frames');
 
   try {
-    browser = await launchBrowser(proxy);
-    const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-        '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    });
+    // ── Phase 1: Try yt-dlp first (no browser needed) ──────────────────────
+    const ytdlpInfo = await getVideoWithYtDlp(url, { proxy, cookieFile });
 
-    if (cookies.length > 0) await context.addCookies(cookies);
-    page = await context.newPage();
-
-    let meta;
-    if (platform === 'youtube') meta = await scrapeYouTube(page, url);
-    else if (platform === 'bilibili') meta = await scrapeBilibili(page, url);
-    else meta = await scrapeGeneric(page, url);
-
-    let frameInfo;
-    const framesDir = path.join(tmpDir, 'frames');
-
-    if (meta.videoUrl) {
+    if (ytdlpInfo && ytdlpInfo.videoUrl) {
       try {
-        frameInfo = await extractFrames(meta.videoUrl, meta.duration, framesDir);
+        // Build headers for FFmpeg (e.g. Bilibili needs Referer)
+        const ffmpegHeaders = {};
+        if (ytdlpInfo.httpHeaders) {
+          if (ytdlpInfo.httpHeaders.Referer) ffmpegHeaders.Referer = ytdlpInfo.httpHeaders.Referer;
+          if (ytdlpInfo.httpHeaders['User-Agent']) ffmpegHeaders['User-Agent'] = ytdlpInfo.httpHeaders['User-Agent'];
+        }
+        // Bilibili: always ensure Referer is set
+        if (platform === 'bilibili' && !ffmpegHeaders.Referer) {
+          ffmpegHeaders.Referer = 'https://www.bilibili.com/';
+        }
+
+        const frameInfo = await extractFrames(
+          ytdlpInfo.videoUrl,
+          ytdlpInfo.durationSecs || ytdlpInfo.duration,
+          framesDir,
+          ffmpegHeaders,
+        );
+
+        if (frameInfo.frames.length > 0) {
+          const visionResult = await analyzeFramesWithVision(
+            frameInfo.frames, ytdlpInfo.title, ytdlpInfo.description
+          );
+          const meta = { title: ytdlpInfo.title, duration: ytdlpInfo.duration, description: ytdlpInfo.description };
+          return formatResult(url, platform, meta, frameInfo.frames.length, frameInfo.adjustedInterval, visionResult);
+        }
       } catch (_) {
+        // FFmpeg failed with yt-dlp URL, fall through to Phase 2
+      }
+    }
+
+    // ── Phase 2: Browser fallback ──────────────────────────────────────────
+    const cookies = loadCookies(platform, cookieFile);
+    let browser, page;
+
+    try {
+      browser = await launchBrowser(proxy);
+      const context = await browser.newContext({
+        userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+          '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      });
+
+      if (cookies.length > 0) await context.addCookies(cookies);
+      page = await context.newPage();
+
+      let meta;
+      if (platform === 'youtube') meta = await scrapeYouTube(page, url);
+      else if (platform === 'bilibili') meta = await scrapeBilibili(page, url);
+      else meta = await scrapeGeneric(page, url);
+
+      // Use yt-dlp metadata if browser didn't get good data
+      if (ytdlpInfo) {
+        if (!meta.title || meta.title === 'Unknown') meta.title = ytdlpInfo.title;
+        if (meta.duration === 'unknown' && ytdlpInfo.duration !== 'unknown') meta.duration = ytdlpInfo.duration;
+        if (!meta.description && ytdlpInfo.description) meta.description = ytdlpInfo.description;
+      }
+
+      let frameInfo;
+
+      if (meta.videoUrl) {
+        // Generic scraper found a direct video URL
+        try {
+          frameInfo = await extractFrames(meta.videoUrl, meta.duration, framesDir);
+        } catch (_) {
+          frameInfo = await captureScreenshots(page, platform, framesDir);
+        }
+      } else {
         frameInfo = await captureScreenshots(page, platform, framesDir);
       }
-    } else {
-      frameInfo = await captureScreenshots(page, platform, framesDir);
+
+      const { frames, adjustedInterval } = frameInfo;
+
+      if (frames.length === 0) {
+        return `⚠️ Could not extract frames from: ${url}\nTitle: ${meta.title}`;
+      }
+
+      const visionResult = await analyzeFramesWithVision(frames, meta.title, meta.description);
+
+      return formatResult(url, platform, meta, frames.length, adjustedInterval, visionResult);
+    } finally {
+      if (browser) await browser.close().catch(() => {});
     }
-
-    const { frames, adjustedInterval } = frameInfo;
-
-    if (frames.length === 0) {
-      return `⚠️ Could not extract frames from: ${url}\nTitle: ${meta.title}`;
-    }
-
-    const visionResult = await analyzeFramesWithVision(frames, meta.title, meta.description);
-
-    return formatResult(url, platform, meta, frames.length, adjustedInterval, visionResult);
   } finally {
-    if (browser) await browser.close().catch(() => {});
     cleanupDir(tmpDir);
   }
 }
@@ -418,7 +589,7 @@ if (require.main === module) {
   const cookieFile = args.find(a => a.startsWith('--cookies='))?.split('=')[1] || null;
 
   if (!url) {
-    console.error('Usage: node index.js <video-url> [--proxy=<proxy>] [--cookies=<file>]');
+    console.error('Usage: node src/index.js <video-url> [--proxy=<proxy>] [--cookies=<file>]');
     process.exit(1);
   }
 
@@ -427,4 +598,4 @@ if (require.main === module) {
     .catch(err => { console.error('Error:', err.message); process.exit(1); });
 }
 
-module.exports = { run, detectPlatform, loadCookies };
+module.exports = { run, detectPlatform, loadCookies, getVideoWithYtDlp };

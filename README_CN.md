@@ -6,7 +6,7 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://clawhub.com"><img src="https://img.shields.io/badge/OpenClaw-Skill-orange" alt="OpenClaw Skill"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D18-green" alt="Node.js"></a>
-  <a href="https://playwright.dev"><img src="https://img.shields.io/badge/Playwright-Chromium-2EAD33" alt="Playwright"></a>
+  <a href="https://playwright.dev"><img src="https://img.shields.io/badge/Playwright--Core-Chromium-2EAD33" alt="Playwright"></a>
   <a href="https://ffmpeg.org"><img src="https://img.shields.io/badge/FFmpeg-required-blue" alt="FFmpeg"></a>
 </p>
 
@@ -36,28 +36,31 @@
               │                       │                       │
               └───────────────────────┼───────────────────────┘
                                       ▼
-                          ┌───────────────────────┐
-                          │  🕷️ Playwright 浏览器   │
-                          │   无头 Chromium         │
-                          └───────────┬───────────┘
-                                      │
-                      ┌───────────────┴───────────────┐
-                      ▼                               ▼
-            ┌──────────────────┐            ┌──────────────────┐
-            │  📹 直接下载视频  │            │  📸 截图回退方案   │
-            └────────┬─────────┘            └────────┬─────────┘
-                     │                               │
-                     └───────────────┬───────────────┘
+                    ┌─────────────────────────────────┐
+                    │  第一阶段：yt-dlp（如已安装）       │
+                    │  直接提取视频 URL + 元数据         │
+                    └───────────────┬─────────────────┘
+                                    │
+                          ┌─────────┴─────────┐
+                          │ 成功？             │ 失败 / 未安装
+                          ▼                   ▼
+                ┌──────────────────┐  ┌───────────────────────┐
+                │ 🖼️ FFmpeg 抽帧    │  │ 第二阶段：浏览器        │
+                │  （带 HTTP 头）    │  │ Playwright（本地或     │
+                │                  │  │ 云浏览器）→ 爬取元数据  │
+                └────────┬─────────┘  └───────────┬───────────┘
+                         │                        │
+                         │           ┌────────────┴────────────┐
+                         │           ▼                         ▼
+                         │  ┌──────────────────┐   ┌──────────────────┐
+                         │  │ 📹 FFmpeg 抽帧    │   │ 📸 截图回退        │
+                         │  │  （有视频 URL 时） │   │ （点击播放 + 跳转） │
+                         │  └────────┬─────────┘   └────────┬─────────┘
+                         └───────────┼─────────────────────┘
                                      ▼
                           ┌───────────────────────┐
-                          │  🖼️ FFmpeg 抽帧         │
-                          │   按间隔提取关键帧      │
-                          └───────────┬───────────┘
-                                      ▼
-                          ┌───────────────────────┐
                           │  🤖 视觉 AI 模型        │
-                          │  GPT-4o / Claude /     │
-                          │  Gemini / LLaVA ...    │
+                          │  任意 OpenAI 兼容端点    │
                           └───────────┬───────────┘
                                       ▼
                           ┌───────────────────────┐
@@ -79,10 +82,22 @@
 | 🌐 **代理支持** | HTTP / HTTPS / SOCKS5 — 支持单次请求或全局配置 |
 | 🍪 **Cookie 注入** | 支持 Netscape 和 JSON 格式，可访问需登录/年龄限制的内容 |
 | 📋 **结构化输出** | 返回标题、时长、关键时刻及时间戳、主题标签 |
+| 📥 **yt-dlp 集成** | 优先通过 yt-dlp 提取视频 URL，无需启动浏览器（可选） |
+| ☁️ **云浏览器** | 支持 Browserless、Browserbase、Steel — 无需本地安装 Chromium |
 
 ---
 
 ## 🚀 快速开始
+
+### 前置依赖
+
+| 依赖 | 是否必须 | 安装方式 |
+|------|----------|----------|
+| Node.js >= 18 | 是 | [nodejs.org](https://nodejs.org) |
+| FFmpeg | 是 | `brew install ffmpeg` / `apt install ffmpeg` |
+| 视觉 AI API Key | 是 | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) 等 |
+| yt-dlp | 推荐 | `brew install yt-dlp` / `pip install yt-dlp` |
+| Chromium | 仅本地模式 | `npx playwright-core install chromium` |
 
 ### 安装
 
@@ -90,16 +105,14 @@
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skills/video-vision
 cd ~/.openclaw/skills/video-vision
 npm install
-npx playwright install chromium
+
+# 仅本地浏览器模式需要（使用云浏览器时无需）
+npx playwright-core install chromium
+
+# 推荐：安装 yt-dlp 以获得最佳视频 URL 提取效果
+# macOS: brew install yt-dlp
+# pip:   pip install yt-dlp
 ```
-
-### 前置依赖
-
-| 依赖 | 安装方式 |
-|------|----------|
-| Node.js ≥ 18 | [nodejs.org](https://nodejs.org) |
-| FFmpeg | `brew install ffmpeg` / `apt install ffmpeg` |
-| 视觉 AI API Key | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) 等 |
 
 ### 运行
 
@@ -175,7 +188,8 @@ node src/index.js https://youtube.com/watch?v=XXXXX --cookies=~/youtube_cookies.
           "VIDEO_VISION_PROXY": "http://127.0.0.1:7890",
           "VIDEO_VISION_FRAME_INTERVAL": "5",
           "VIDEO_VISION_MAX_FRAMES": "20",
-          "VIDEO_VISION_COOKIES_DIR": "~/.openclaw/cookies"
+          "VIDEO_VISION_COOKIES_DIR": "~/.openclaw/cookies",
+          "VIDEO_VISION_BROWSER": "local"
         }
       }
     ]
@@ -186,12 +200,39 @@ node src/index.js https://youtube.com/watch?v=XXXXX --cookies=~/youtube_cookies.
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `VIDEO_VISION_API_KEY` | *必填* | 视觉模型 API Key |
-| `VIDEO_VISION_API_URL` | `https://api.openai.com/v1/chat/completions` | 自定义 API 端点 |
+| `VIDEO_VISION_API_URL` | `https://api.openai.com/v1/chat/completions` | 任意 OpenAI 兼容的视觉端点 |
 | `VIDEO_VISION_MODEL` | `gpt-4o` | 使用的视觉模型 |
 | `VIDEO_VISION_PROXY` | — | 默认代理地址 |
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | 抽帧间隔（秒） |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | 每个视频最大帧数 |
 | `VIDEO_VISION_COOKIES_DIR` | — | Cookie 文件目录 |
+| `VIDEO_VISION_BROWSER` | `local` | 浏览器模式：`local` / `browserless` / `browserbase` / `steel` |
+| `VIDEO_VISION_BROWSERLESS_TOKEN` | — | [Browserless](https://www.browserless.io/) API 令牌 |
+| `VIDEO_VISION_BROWSERBASE_API_KEY` | — | [Browserbase](https://www.browserbase.com/) API 密钥 |
+| `VIDEO_VISION_BROWSERBASE_PROJECT_ID` | — | Browserbase 项目 ID |
+| `VIDEO_VISION_STEEL_API_KEY` | — | [Steel](https://steel.dev/) API 密钥 |
+
+---
+
+## ☁️ 云浏览器
+
+如果不想在本地安装 Chromium（例如在无服务器或 CI 环境中），可以连接云浏览器。将 `VIDEO_VISION_BROWSER` 设为以下任一提供商：
+
+| 提供商 | 所需环境变量 | 免费额度 |
+|--------|-------------|----------|
+| [Browserless](https://www.browserless.io/) | `VIDEO_VISION_BROWSERLESS_TOKEN` | 每月 1,000 单位 |
+| [Browserbase](https://www.browserbase.com/) | `VIDEO_VISION_BROWSERBASE_API_KEY` + `VIDEO_VISION_BROWSERBASE_PROJECT_ID` | 每月 100 个会话 |
+| [Steel](https://steel.dev/) | `VIDEO_VISION_STEEL_API_KEY` | 每月 100 个会话 |
+
+**示例 — Steel：**
+
+```bash
+export VIDEO_VISION_BROWSER=steel
+export VIDEO_VISION_STEEL_API_KEY="your-key"
+node src/index.js https://youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+使用云浏览器时，**无需**运行 `npx playwright-core install chromium`。
 
 ---
 
@@ -218,7 +259,7 @@ node src/index.js https://youtube.com/watch?v=XXXXX --cookies=~/youtube_cookies.
 ```
 openclaw-video-vision/
 ├── src/
-│   └── index.js              # 核心模块：爬虫、抽帧、视觉 AI 客户端
+│   └── index.js              # 核心模块：yt-dlp、爬虫、抽帧、视觉 AI 客户端
 ├── skills/
 │   └── video-vision/
 │       └── SKILL.md          # OpenClaw 技能清单
