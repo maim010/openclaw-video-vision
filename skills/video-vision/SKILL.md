@@ -144,10 +144,6 @@ This video covers [main topic]...
 ## Installation
 
 ```bash
-# Install via clawhub
-clawhub install video-vision
-
-# Or manually clone into your workspace skills folder
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skills/video-vision
 cd ~/.openclaw/skills/video-vision
 npm install

@@ -88,10 +88,6 @@
 ### Install
 
 ```bash
-# Via ClawHub
-clawhub install video-vision
-
-# Or manually
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/skills/video-vision
 cd ~/.openclaw/skills/video-vision
 npm install
