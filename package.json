@@ -1,0 +1,46 @@
+{
+  "name": "openclaw-video-vision",
+  "version": "1.0.0",
+  "description": "OpenClaw skill — crawl YouTube, Bilibili & other video platforms, extract key frames with FFmpeg, and summarize content using vision AI models",
+  "main": "src/index.js",
+  "bin": {
+    "video-vision": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "example:youtube": "node examples/youtube_example.js",
+    "example:bilibili": "node examples/bilibili_example.js"
+  },
+  "keywords": [
+    "openclaw",
+    "video",
+    "vision",
+    "ai",
+    "youtube",
+    "bilibili",
+    "playwright",
+    "ffmpeg",
+    "frame-extraction",
+    "video-summarization",
+    "gpt-4o",
+    "claude",
+    "gemini",
+    "web-scraping"
+  ],
+  "author": "maim010 (https://github.com/maim010)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maim010/openclaw-video-vision.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maim010/openclaw-video-vision/issues"
+  },
+  "homepage": "https://github.com/maim010/openclaw-video-vision#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "playwright": "^1.42.0"
+  }
+}
