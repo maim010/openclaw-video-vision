@@ -1,4 +1,4 @@
-<a href="./README_CN.md">📖 中文文档</a>
+<a href="./README_CN.md">📖 简体中文</a>
 # 🎬 openclaw-video-vision
 
 > **AI-powered video understanding** — Crawl any video platform, extract key frames, get structured summaries powered by vision AI.
