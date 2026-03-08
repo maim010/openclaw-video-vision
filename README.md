@@ -99,7 +99,7 @@
 | FFmpeg | Yes | `brew install ffmpeg` / `apt install ffmpeg` |
 | Vision API Key | Yes | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) / etc. |
 | yt-dlp | Recommended | `brew install yt-dlp` / `pip install yt-dlp` |
-| Chromium | Local mode only | `npx playwright-core install chromium` |
+| Chromium | Optional (browser fallback only) | `npm install playwright-core && npx playwright-core install chromium` |
 
 ### Install
 

@@ -97,7 +97,7 @@
 | FFmpeg | 是 | `brew install ffmpeg` / `apt install ffmpeg` |
 | 视觉 AI API Key | 是 | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) 等 |
 | yt-dlp | 推荐 | `brew install yt-dlp` / `pip install yt-dlp` |
-| Chromium | 仅本地模式 | `npx playwright-core install chromium` |
+| Chromium | 可选（仅浏览器回退时需要） | `npm install playwright-core && npx playwright-core install chromium` |
 
 ### 安装
 

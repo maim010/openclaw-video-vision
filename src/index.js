@@ -8,7 +8,6 @@
  * License: MIT
  */
 
-const { chromium } = require('playwright-core');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -124,6 +123,16 @@ function getVideoWithYtDlp(url, { proxy = null, cookieFile = null } = {}) {
 
 // ─── Browser launcher — supports local + cloud browsers ──────────────────────
 async function launchBrowser(proxy = null) {
+  let chromium;
+  try {
+    chromium = require('playwright-core').chromium;
+  } catch (_) {
+    throw new Error(
+      'playwright-core is not installed. Install it with: npm install playwright-core\n' +
+      'If you only need the yt-dlp + FFmpeg path, playwright-core is not required.'
+    );
+  }
+
   const mode = CONFIG.browser;
 
   if (mode === 'browserless') {
