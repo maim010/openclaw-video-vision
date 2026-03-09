@@ -30,26 +30,39 @@ It works as an **OpenClaw skill**, meaning you just tell your AI agent in natura
 ## Example
 
 ```
-> Summarize this video: https://youtube.com/watch?v=...
+> Summarize this video: https://youtube.com/watch?v=2WbwRwmDHlA
 ```
 
 ```
-Video Summary: Introduction to Transformer Architecture
-Platform: YouTube | Duration: 18:42
-Frames analyzed: 20 (every ~56s)
+🎬 Video Summary: OpenAI 放大招！深夜发布GPT-5.4，真正实现原生操控电脑，
+   OpenClaw 天选模型来了，附配置教程！ | 零度解说
+
+📺 Platform: YouTube | Duration: 9:46
+👁️  Frames analyzed: 117 (every ~5s)
+🔗 URL: https://youtube.com/watch?v=2WbwRwmDHlA
 
 SUMMARY:
-This video provides a detailed walkthrough of the Transformer
-neural network architecture, covering self-attention mechanisms,
-positional encoding, and encoder-decoder structures.
+This video is a technical tutorial and review of the newly released GPT-5.4
+model, highlighting its groundbreaking "native computer control" capability
+through the OpenClaw agent framework. The presenter demonstrates performance
+benchmarks comparing GPT-5.4 against previous models, showcasing significant
+improvements in reasoning, document generation, and browser automation. The
+core of the video is a step-by-step guide for Windows users to install
+OpenClaw, configure it with an OpenAI API key, and switch the model to
+GPT-5.4 within the Codex application to achieve full system access.
 
 KEY MOMENTS:
-- 0:00  Title slide — "Attention Is All You Need" paper reference
-- 4:30  Diagram of multi-head attention mechanism
-- 9:20  Python code for scaled dot-product attention
-- 14:10 Comparison: RNN vs Transformer training speed
+- Frame ~2:  Benchmark chart shows GPT-5.4 achieving 97% accuracy, topping the list
+- Frame ~14: Bar chart compares GPT-5.4, GPT-5.2, and other models (83% win rate)
+- Frame ~48: Windows installation tutorial begins — PowerShell terminal
+- Frame ~50: "OpenClaw installed successfully (2026.3.2)!"
+- Frame ~56: Onboarding terminal — selecting "OpenAI Codex" API provider
+- Frame ~82: Downloading the official "Codex" app from Microsoft Store
+- Frame ~91: Selecting "GPT-5.4" from the model list in Codex
+- Frame ~94: Enabling "Full Access Permissions" for computer control
 
-TOPICS: deep learning, transformers, attention mechanism, NLP
+TOPICS: GPT-5.4, OpenClaw, AI Agent, Computer Control, OpenAI, Codex,
+        Model Benchmarking, Windows Tutorial, API Key, AI Automation
 ```
 
 ---

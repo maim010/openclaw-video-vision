@@ -30,25 +30,36 @@
 ## 效果演示
 
 ```
-> 总结一下这个视频: https://youtube.com/watch?v=...
+> 总结一下这个视频: https://youtube.com/watch?v=2WbwRwmDHlA
 ```
 
 ```
-视频摘要: Transformer 架构入门
-平台: YouTube | 时长: 18:42
-分析帧数: 20（每 ~56 秒一帧）
+🎬 视频摘要: OpenAI 放大招！深夜发布GPT-5.4，真正实现原生操控电脑，
+   OpenClaw 天选模型来了，附配置教程！ | 零度解说
+
+📺 平台: YouTube | 时长: 9:46
+👁️  分析帧数: 117（每 ~5 秒一帧）
+🔗 URL: https://youtube.com/watch?v=2WbwRwmDHlA
 
 摘要:
-该视频详细讲解了 Transformer 神经网络架构，涵盖自注意力机制、
-位置编码和编码器-解码器结构。讲者使用了动画示意图和代码示例。
+该视频是对最新发布的 GPT-5.4 模型的技术教程和测评，重点介绍了其通过
+OpenClaw 智能体框架实现的突破性「原生电脑操控」能力。讲者展示了 GPT-5.4
+与 GPT-5.2、GPT-5.3 等模型的性能对比基准，在推理、文档生成和浏览器自动化
+方面有显著提升。视频核心内容是 Windows 用户的手把手教程：安装 OpenClaw、
+配置 OpenAI API 密钥、在 Codex 应用中切换到 GPT-5.4 以实现完整系统访问。
 
 关键时刻:
-- 0:00  标题页 — 引用 "Attention Is All You Need" 论文
-- 4:30  多头注意力机制示意图
-- 9:20  缩放点积注意力的 Python 代码
-- 14:10 RNN 与 Transformer 训练速度对比
+- 第 ~2 帧:  基准测试图表，GPT-5.4 以 97% 准确率位居榜首
+- 第 ~14 帧: 柱状图对比 GPT-5.4、GPT-5.2 等模型（83% 胜率）
+- 第 ~48 帧: Windows 安装教程开始 — PowerShell 终端
+- 第 ~50 帧: "OpenClaw installed successfully (2026.3.2)!"
+- 第 ~56 帧: 引导终端 — 选择 "OpenAI Codex" API 服务商
+- 第 ~82 帧: 从 Microsoft Store 下载官方 Codex 应用
+- 第 ~91 帧: 在 Codex 中从模型列表选择 "GPT-5.4"
+- 第 ~94 帧: 启用「完全访问权限」实现电脑操控
 
-主题标签: 深度学习, Transformer, 注意力机制, NLP
+主题标签: GPT-5.4, OpenClaw, AI Agent, 电脑操控, OpenAI, Codex,
+          模型基准测试, Windows 教程, API 密钥, AI 自动化
 ```
 
 ---
