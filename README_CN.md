@@ -1,311 +1,190 @@
-<a href="./README.md">📖 English</a>
-# 🎬 openclaw-video-vision
+# openclaw-video-vision
 
-> **AI 驱动的视频理解工具** — 爬取任意视频平台，提取关键帧，通过视觉 AI 生成结构化摘要。
+> **不用看视频，也能理解视频。让 AI 来。**
+
+给它一个链接 — YouTube、Bilibili 或任何有视频的网页 — 返回结构化摘要，包含关键时刻、时间戳和主题标签。由视觉 AI 驱动。
 
 <p align="center">
+  <a href="https://github.com/maim010/openclaw-video-vision/stargazers"><img src="https://img.shields.io/github/stars/maim010/openclaw-video-vision?style=social" alt="GitHub Stars"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://clawhub.com"><img src="https://img.shields.io/badge/OpenClaw-Skill-orange" alt="OpenClaw Skill"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D18-green" alt="Node.js"></a>
-  <a href="https://playwright.dev"><img src="https://img.shields.io/badge/Playwright--Core-Chromium-2EAD33" alt="Playwright"></a>
-  <a href="https://ffmpeg.org"><img src="https://img.shields.io/badge/FFmpeg-required-blue" alt="FFmpeg"></a>
+  <a href="https://maim010.github.io/openclaw-video-vision/zh/"><img src="https://img.shields.io/badge/文档-VitePress-646CFF" alt="文档"></a>
 </p>
 
 <p align="center">
-  <b>YouTube</b> · <b>Bilibili</b> · <b>任意视频网页</b>
+  <a href="https://maim010.github.io/openclaw-video-vision/zh/">中文文档</a> · <a href="https://maim010.github.io/openclaw-video-vision/">English Docs</a> · <a href="./README.md">English README</a>
 </p>
 
 ---
 
-## 工作原理
+## 为什么做这个？
+
+你发现了一个 40 分钟的技术演讲、一个 2 小时的课程合集、或一个看不懂语言的 B 站教程。你没时间全看完，但又需要知道里面讲了什么。
+
+**openclaw-video-vision** 解决的就是这个问题：粘贴链接，拿到摘要 — 关键时刻精确到时间戳，直接跳到你关心的部分。
+
+它是一个 **OpenClaw 技能**，你只需要用自然语言告诉 AI 智能体：*「帮我总结一下这个视频」* — 剩下的它搞定。
+
+---
+
+## 效果演示
 
 ```
-                    ┌─────────────────────────────────────────────┐
-                    │             openclaw-video-vision            │
-                    └─────────────────────────────────────────────┘
-                                        │
-              ┌─────────────────────────┼─────────────────────────┐
-              ▼                         ▼                         ▼
-     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-     │  🔗 输入视频 URL  │     │  🍪 Cookies      │     │  🌐 代理         │
-     │  YouTube / B站   │     │  （可选）          │     │  （可选）         │
-     └────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-              │                       │                       │
-              └───────────────────────┼───────────────────────┘
-                                      ▼
-                    ┌─────────────────────────────────┐
-                    │  第一阶段：yt-dlp（如已安装）       │
-                    │  直接提取视频 URL + 元数据         │
-                    └───────────────┬─────────────────┘
-                                    │
-                          ┌─────────┴─────────┐
-                          │ 成功？             │ 失败 / 未安装
-                          ▼                   ▼
-                ┌──────────────────┐  ┌───────────────────────┐
-                │ 🖼️ FFmpeg 抽帧    │  │ 第二阶段：浏览器        │
-                │  （带 HTTP 头）    │  │ Playwright（本地或     │
-                │                  │  │ 云浏览器）→ 爬取元数据  │
-                └────────┬─────────┘  └───────────┬───────────┘
-                         │                        │
-                         │           ┌────────────┴────────────┐
-                         │           ▼                         ▼
-                         │  ┌──────────────────┐   ┌──────────────────┐
-                         │  │ 📹 FFmpeg 抽帧    │   │ 📸 截图回退        │
-                         │  │  （有视频 URL 时） │   │ （点击播放 + 跳转） │
-                         │  └────────┬─────────┘   └────────┬─────────┘
-                         └───────────┼─────────────────────┘
-                                     ▼
-                          ┌───────────────────────┐
-                          │  🤖 视觉 AI 模型        │
-                          │  任意 OpenAI 兼容端点    │
-                          └───────────┬───────────┘
-                                      ▼
-                          ┌───────────────────────┐
-                          │  📋 结构化输出           │
-                          │  摘要 + 关键时刻 +      │
-                          │  主题标签 + 时间戳       │
-                          └───────────────────────┘
+> 总结一下这个视频: https://youtube.com/watch?v=...
+```
+
+```
+视频摘要: Transformer 架构入门
+平台: YouTube | 时长: 18:42
+分析帧数: 20（每 ~56 秒一帧）
+
+摘要:
+该视频详细讲解了 Transformer 神经网络架构，涵盖自注意力机制、
+位置编码和编码器-解码器结构。讲者使用了动画示意图和代码示例。
+
+关键时刻:
+- 0:00  标题页 — 引用 "Attention Is All You Need" 论文
+- 4:30  多头注意力机制示意图
+- 9:20  缩放点积注意力的 Python 代码
+- 14:10 RNN 与 Transformer 训练速度对比
+
+主题标签: 深度学习, Transformer, 注意力机制, NLP
 ```
 
 ---
 
-## ✨ 功能特性
+## 快速开始
 
-| 功能 | 说明 |
-|------|------|
-| 🕷️ **智能爬取** | 基于 Playwright 无头浏览器，针对不同平台定制爬虫 |
-| 🖼️ **关键帧提取** | FFmpeg 按可配置间隔抽帧，支持截图回退 |
-| 🤖 **视觉 AI 分析** | 兼容任何 OpenAI 格式的视觉模型接口（GPT-4o、Claude、Gemini 等） |
-| 🌐 **代理支持** | HTTP / HTTPS / SOCKS5 — 支持单次请求或全局配置 |
-| 🍪 **Cookie 注入** | 支持 Netscape 和 JSON 格式，可访问需登录/年龄限制的内容 |
-| 📋 **结构化输出** | 返回标题、时长、关键时刻及时间戳、主题标签 |
-| 📥 **yt-dlp 集成** | 优先通过 yt-dlp 提取视频 URL，无需启动浏览器（可选） |
-| ☁️ **云浏览器** | 支持 Browserless、Browserbase、Steel — 无需本地安装 Chromium |
-
----
-
-## 🚀 快速开始
-
-### 前置依赖
-
-| 依赖 | 是否必须 | 安装方式 |
-|------|----------|----------|
-| Node.js >= 18 | 是 | [nodejs.org](https://nodejs.org) |
-| FFmpeg | 是 | `brew install ffmpeg` / `apt install ffmpeg` |
-| 视觉 AI API Key | 是 | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) 等 |
-| yt-dlp | 推荐 | `brew install yt-dlp` / `pip install yt-dlp` |
-| Chromium | 可选（仅浏览器回退时需要） | `npm install playwright-core && npx playwright-core install chromium` |
-
-### 安装
+### 1. 安装
 
 ```bash
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
 cd ~/.openclaw/workspace/skills/video-vision
 npm install
-
-# 仅本地浏览器模式需要（使用云浏览器时无需）
-npx playwright-core install chromium
-
-# 推荐：安装 yt-dlp 以获得最佳视频 URL 提取效果
-# macOS: brew install yt-dlp
-# pip:   pip install yt-dlp
 ```
 
-然后在 `~/.openclaw/openclaw.json` 中启用技能：
+依赖：**Node.js >= 18**、**FFmpeg**（`brew install ffmpeg` / `apt install ffmpeg`）、视觉 API 密钥。
+
+推荐安装：**yt-dlp**（`brew install yt-dlp` / `pip install yt-dlp`），效果最佳。
+
+### 2. 启用技能
+
+在 `~/.openclaw/openclaw.json` 中添加：
 
 ```json
 {
   "skills": {
     "entries": {
       "video-vision": {
-        "enabled": true
+        "enabled": true,
+        "env": {
+          "VIDEO_VISION_API_KEY": "sk-..."
+        }
       }
     }
   }
 }
 ```
 
-### 运行
+### 3. 使用
 
-```bash
-# 设置 API Key
-export VIDEO_VISION_API_KEY="sk-..."
-
-# 总结一个视频
-node src/index.js https://youtube.com/watch?v=dQw4w9WgXcQ
-
-# 使用代理
-node src/index.js https://www.bilibili.com/video/BV1xx411c7mD --proxy=http://127.0.0.1:7890
-
-# 使用 Cookies
-node src/index.js https://youtube.com/watch?v=XXXXX --cookies=~/youtube_cookies.json
-```
-
----
-
-## 💬 在 OpenClaw 中使用
-
-安装后，直接对 OpenClaw 智能体说：
+对 OpenClaw 智能体说：
 
 ```
 > 总结一下这个 YouTube 视频: https://youtube.com/watch?v=dQw4w9WgXcQ
+> 这个 B 站视频讲了什么？ https://bilibili.com/video/BV1xx411c7mD
 ```
 
-```
-> 这个 B 站视频讲了什么？https://www.bilibili.com/video/BV1xx411c7mD
-  使用代理 127.0.0.1:7890，cookies 文件在 ~/bilibili_cookies.json
-```
-
-```
-> 总结这个播放列表里的所有视频: https://youtube.com/playlist?list=PLxxxxxx
-```
-
-### 输出示例
-
-```
-🎬 视频摘要: Transformer 架构入门
-📺 平台: YouTube | 时长: 18:42
-👁️  分析帧数: 20（每 ~56 秒一帧）
-🔗 URL: https://youtube.com/watch?v=...
-
-摘要:
-该视频详细讲解了 Transformer 神经网络架构，涵盖自注意力机制、位置编码和
-编码器-解码器结构。讲者使用了动画示意图和代码示例。
-
-关键时刻:
-- 第 ~1 帧: 标题页，引用 "Attention Is All You Need" 论文
-- 第 ~5 帧: 多头注意力机制示意图
-- 第 ~10 帧: 缩放点积注意力的 Python 代码
-- 第 ~15 帧: RNN 与 Transformer 训练速度对比
-
-主题标签: 深度学习, Transformer, 注意力机制, NLP, 神经网络
-```
-
----
-
-## ⚙️ 配置
-
-通过环境变量或 `~/.openclaw/openclaw.json` 配置：
-
-```json
-{
-  "skills": {
-    "entries": [
-      {
-        "name": "video-vision",
-        "env": {
-          "VIDEO_VISION_API_KEY": "sk-...",
-          "VIDEO_VISION_MODEL": "gpt-4o",
-          "VIDEO_VISION_PROXY": "http://127.0.0.1:7890",
-          "VIDEO_VISION_FRAME_INTERVAL": "5",
-          "VIDEO_VISION_MAX_FRAMES": "20",
-          "VIDEO_VISION_COOKIES_DIR": "~/.openclaw/cookies",
-          "VIDEO_VISION_BROWSER": "local"
-        }
-      }
-    ]
-  }
-}
-```
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `VIDEO_VISION_API_KEY` | *必填* | 视觉模型 API Key |
-| `VIDEO_VISION_API_URL` | `https://api.openai.com/v1/chat/completions` | 任意 OpenAI 兼容的视觉端点 |
-| `VIDEO_VISION_MODEL` | `gpt-4o` | 使用的视觉模型 |
-| `VIDEO_VISION_MODE` | `auto` | 提取模式：`auto`（先 yt-dlp，失败回退浏览器）/ `ytdlp`（仅 yt-dlp + FFmpeg，不启动浏览器）/ `browser`（仅浏览器，跳过 yt-dlp） |
-| `VIDEO_VISION_PROXY` | — | 默认代理地址 |
-| `VIDEO_VISION_FRAME_INTERVAL` | `5` | 抽帧间隔（秒） |
-| `VIDEO_VISION_MAX_FRAMES` | `20` | 每个视频最大帧数 |
-| `VIDEO_VISION_COOKIES_DIR` | — | Cookie 文件目录 |
-| `VIDEO_VISION_BROWSER` | `local` | 浏览器模式：`local` / `browserless` / `browserbase` / `steel` |
-| `VIDEO_VISION_BROWSERLESS_TOKEN` | — | [Browserless](https://www.browserless.io/) API 令牌 |
-| `VIDEO_VISION_BROWSERBASE_API_KEY` | — | [Browserbase](https://www.browserbase.com/) API 密钥 |
-| `VIDEO_VISION_BROWSERBASE_PROJECT_ID` | — | Browserbase 项目 ID |
-| `VIDEO_VISION_STEEL_API_KEY` | — | [Steel](https://steel.dev/) API 密钥 |
-
----
-
-## ☁️ 云浏览器
-
-如果不想在本地安装 Chromium（例如在无服务器或 CI 环境中），可以连接云浏览器。将 `VIDEO_VISION_BROWSER` 设为以下任一提供商：
-
-| 提供商 | 所需环境变量 | 免费额度 |
-|--------|-------------|----------|
-| [Browserless](https://www.browserless.io/) | `VIDEO_VISION_BROWSERLESS_TOKEN` | 每月 1,000 单位 |
-| [Browserbase](https://www.browserbase.com/) | `VIDEO_VISION_BROWSERBASE_API_KEY` + `VIDEO_VISION_BROWSERBASE_PROJECT_ID` | 每月 100 个会话 |
-| [Steel](https://steel.dev/) | `VIDEO_VISION_STEEL_API_KEY` | 每月 100 个会话 |
-
-**示例 — Steel：**
+或直接运行：
 
 ```bash
-export VIDEO_VISION_BROWSER=steel
-export VIDEO_VISION_STEEL_API_KEY="your-key"
+export VIDEO_VISION_API_KEY="sk-..."
 node src/index.js https://youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
-使用云浏览器时，**无需**运行 `npx playwright-core install chromium`。
+---
+
+## 工作原理
+
+```
+URL + Cookies + 代理（可选）
+        │
+        ▼
+┌─────────────────────────┐     ┌──────────────────────────┐
+│ 阶段 1: yt-dlp          │────▶│ 阶段 2: 浏览器            │
+│ 提取 URL + 元数据        │失败 │ Playwright（本地/云）      │
+│ FFmpeg 抽帧              │     │ 爬取 → FFmpeg 或          │
+└────────────┬────────────┘     │ 截图回退                   │
+             │                  └─────────────┬────────────┘
+             └──────────┬─────────────────────┘
+                        ▼
+              ┌───────────────────┐
+              │ 视觉 AI 模型       │
+              │ (GPT-4o, Claude,  │
+              │  Gemini 等)       │
+              └────────┬──────────┘
+                       ▼
+                结构化摘要
+              + 关键时刻 + 时间戳
+              + 主题标签
+```
+
+**两条提取路径**，自动回退：
+- **yt-dlp + FFmpeg**（首选）— 速度快，不需要浏览器
+- **Playwright 浏览器** — 用于 yt-dlp 搞不定的站点，支持云浏览器（Browserless / Browserbase / Steel）
 
 ---
 
-## 🍪 Cookie 配置
+## 功能特性
 
-访问需要登录或有年龄限制的内容时，需要提供 Cookie 文件。详见完整的 [Cookie 配置指南](docs/cookie-setup.md)。
-
-**JSON 格式** — `youtube_cookies.json`：
-```json
-[
-  { "name": "SID", "value": "xxx", "domain": ".youtube.com", "path": "/" }
-]
-```
-
-**Netscape 格式** — `bilibili_cookies.txt`：
-```
-.bilibili.com	TRUE	/	FALSE	1893456000	SESSDATA	your_value
-```
+| | |
+|---|---|
+| **支持平台** | YouTube、Bilibili、任何包含 `<video>` 元素的网页 |
+| **视觉 AI** | 兼容任何 OpenAI 格式端点 — GPT-4o、Claude、Gemini、本地模型 |
+| **代理** | HTTP / HTTPS / SOCKS5，支持单次请求或全局配置 |
+| **Cookie** | Netscape 和 JSON 格式，访问需登录 / 年龄限制的内容 |
+| **云浏览器** | Browserless、Browserbase、Steel — 无需本地 Chromium |
+| **可配置** | 抽帧间隔、最大帧数、提取模式（`auto`/`ytdlp`/`browser`） |
+| **跨平台** | macOS、Linux、Windows、Android/Termux（yt-dlp 模式）、CI/无服务器 |
 
 ---
 
-## 🗂️ 项目结构
+## 配置
 
-```
-openclaw-video-vision/
-├── src/
-│   └── index.js              # 核心模块：yt-dlp、爬虫、抽帧、视觉 AI 客户端
-├── skills/
-│   └── video-vision/
-│       └── SKILL.md          # OpenClaw 技能清单
-├── examples/
-│   ├── youtube_example.js    # YouTube 使用示例
-│   └── bilibili_example.js   # Bilibili 使用示例
-├── docs/
-│   └── cookie-setup.md       # Cookie 导出与配置指南
-├── package.json
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md                 # 英文文档
-└── README_CN.md              # 中文文档（本文件）
-```
+所有设置通过环境变量或 `~/.openclaw/openclaw.json`：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `VIDEO_VISION_API_KEY` | *必填* | 视觉模型 API 密钥 |
+| `VIDEO_VISION_API_URL` | OpenAI 端点 | 任意 OpenAI 兼容的视觉端点 |
+| `VIDEO_VISION_MODEL` | `gpt-4o` | 使用的视觉模型 |
+| `VIDEO_VISION_MODE` | `auto` | `auto` / `ytdlp` / `browser` |
+| `VIDEO_VISION_PROXY` | — | 默认代理地址 |
+| `VIDEO_VISION_FRAME_INTERVAL` | `5` | 抽帧间隔（秒） |
+| `VIDEO_VISION_MAX_FRAMES` | `20` | 每个视频最大帧数 |
+| `VIDEO_VISION_BROWSER` | `local` | `local` / `browserless` / `browserbase` / `steel` |
+
+完整配置参考：[中文文档](https://maim010.github.io/openclaw-video-vision/zh/configuration)
 
 ---
 
-## 🤝 参与贡献
+## 参与贡献
 
-欢迎贡献代码！我们特别期待以下方向的帮助：
+欢迎贡献！特别期待以下方向：
 
-- 🎯 **更多平台** — TikTok、Twitter/X、Vimeo、Dailymotion
-- 🧠 **更智能的提取** — 场景切换检测、音频转录
-- 🔌 **模型适配器** — 本地模型（LLaVA、CogVLM）、更多 API 服务商
-- 📦 **输出格式** — JSON 导出、SRT 字幕、Markdown 报告
+- **更多平台** — TikTok、Twitter/X、Vimeo、Dailymotion
+- **更智能的提取** — 场景切换检测、音频转录
+- **模型适配器** — 本地模型（LLaVA、CogVLM）、更多服务商
+- **输出格式** — JSON 导出、SRT 字幕、Markdown 报告
 
 详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 
-## 📄 许可证
+## 许可证
 
 MIT © [maim010](https://github.com/maim010)
 
-## 🙏 赞助
+## 赞助
 
 本项目由 [zmto](https://zmto.com) 赞助，感谢对开源的支持！
