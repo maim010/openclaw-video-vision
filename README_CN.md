@@ -30,7 +30,7 @@
 ## 效果演示
 
 ```
-> 总结一下这个视频: https://youtube.com/watch?v=2WbwRwmDHlA
+> 总结一下这个视频: https://youtube.com/watch?v=xxxxx
 ```
 
 ```
@@ -102,15 +102,15 @@ npm install
 对 OpenClaw 智能体说：
 
 ```
-> 总结一下这个 YouTube 视频: https://youtube.com/watch?v=dQw4w9WgXcQ
-> 这个 B 站视频讲了什么？ https://bilibili.com/video/BV1xx411c7mD
+> 总结一下这个 YouTube 视频: https://youtube.com/watch?v=xxxxx
+> 这个 B 站视频讲了什么？ https://bilibili.com/video/xxxxx
 ```
 
 或直接运行：
 
 ```bash
 export VIDEO_VISION_API_KEY="sk-..."
-node src/index.js https://youtube.com/watch?v=dQw4w9WgXcQ
+node src/index.js https://youtube.com/watch?v=xxxxx
 ```
 
 ---
