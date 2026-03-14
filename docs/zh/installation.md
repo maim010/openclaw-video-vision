@@ -8,10 +8,13 @@
 | FFmpeg | 是 | `brew install ffmpeg` / `apt install ffmpeg` |
 | 视觉 API 密钥 | 是 | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) / 等 |
 | yt-dlp | 推荐 | `brew install yt-dlp` / `pip install yt-dlp` |
+| whisper.cpp | 可选（转录） | 参见下方 [Whisper.cpp 安装](#whispercpp-安装) |
 | playwright-core | 可选 | `npm install playwright-core` |
 | Chromium | 可选（仅浏览器路径） | `npx playwright-core install chromium` |
 
 > **注意：** `playwright-core` 是可选依赖。如果无法安装（例如在 Android/PRoot 上），yt-dlp + FFmpeg 路径可以独立工作。设置 `VIDEO_VISION_MODE=ytdlp` 可以完全避免浏览器回退。
+
+> **音频转录：** whisper.cpp 提供本地音频转录。启用后，视觉 AI 将同时接收视频帧和转录文本，生成更丰富的摘要。设置 `VIDEO_VISION_LOW_RESOURCE=true` 可禁用。
 
 ## 安装步骤
 
@@ -35,6 +38,30 @@ export VIDEO_VISION_API_KEY="sk-..."
 
 # 总结一个视频
 node src/index.js https://youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+## Whisper.cpp 安装
+
+在 12+ CPU 核心和 14+ GB RAM 的机器上，音频转录默认开启。安装步骤：
+
+```bash
+# 编译 whisper.cpp
+git clone https://github.com/ggml-org/whisper.cpp.git /opt/whisper.cpp
+cd /opt/whisper.cpp
+cmake -B build
+cmake --build build --config Release -j$(nproc)
+sudo ln -s /opt/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
+
+# 下载 medium 模型（约 1.5GB）
+mkdir -p ~/.cache/whisper
+wget -q https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin \
+  -O ~/.cache/whisper/ggml-medium.bin
+```
+
+低配机器可跳过转录：
+
+```bash
+export VIDEO_VISION_LOW_RESOURCE=true
 ```
 
 ## 特定平台说明

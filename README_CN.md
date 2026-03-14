@@ -78,6 +78,10 @@ npm install
 
 推荐安装：**yt-dlp**（`brew install yt-dlp` / `pip install yt-dlp`），效果最佳。
 
+音频转录（16 核/16GB+ 机器默认开启）：**[whisper.cpp](https://github.com/ggml-org/whisper.cpp)**，安装步骤见下方。
+
+> **低资源模式：** 如果机器 CPU 少于 12 核或 RAM 少于 14GB，设置 `VIDEO_VISION_LOW_RESOURCE=true` 可跳过转录和资源检查。
+
 ### 2. 启用技能
 
 在 `~/.openclaw/openclaw.json` 中添加：
@@ -128,11 +132,21 @@ URL + Cookies + 代理（可选）
 └────────────┬────────────┘     │ 截图回退                   │
              │                  └─────────────┬────────────┘
              └──────────┬─────────────────────┘
+                   ┌────┴────┐
+                   │ FFmpeg  │（并行）
+                   ├─────────┤
+                   │ 视频帧  │  →  JPG 文件
+                   │ 音频    │  →  16kHz 单声道 WAV
+                   └────┬────┘
+                        │
+                   ┌────┴──────────┐
+                   │ whisper-cli   │  →  带时间戳的转录文本
+                   │ (ggml-medium) │
+                   └────┬──────────┘
                         ▼
               ┌───────────────────┐
               │ 视觉 AI 模型       │
-              │ (GPT-4o, Claude,  │
-              │  Gemini 等)       │
+              │（视频帧 + 转录文本）│
               └────────┬──────────┘
                        ▼
                 结构化摘要
@@ -156,6 +170,7 @@ URL + Cookies + 代理（可选）
 | **Cookie** | Netscape 和 JSON 格式，访问需登录 / 年龄限制的内容 |
 | **云浏览器** | Browserless、Browserbase、Steel — 无需本地 Chromium |
 | **可配置** | 抽帧间隔、最大帧数、提取模式（`auto`/`ytdlp`/`browser`） |
+| **音频转录** | 本地 whisper.cpp — 语音转文字注入视觉提示词 |
 | **跨平台** | macOS、Linux、Windows、Android/Termux（yt-dlp 模式）、CI/无服务器 |
 
 ---
@@ -173,6 +188,10 @@ URL + Cookies + 代理（可选）
 | `VIDEO_VISION_PROXY` | — | 默认代理地址 |
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | 抽帧间隔（秒） |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | 每个视频最大帧数 |
+| `VIDEO_VISION_LOW_RESOURCE` | `false` | 跳过资源检查，禁用转录 |
+| `VIDEO_VISION_TRANSCRIPTION` | `auto` | `auto` / `on` / `off` |
+| `VIDEO_VISION_WHISPER_PATH` | `whisper-cli` | whisper-cli 二进制文件路径 |
+| `VIDEO_VISION_WHISPER_MODEL` | `medium` | 模型：tiny/base/small/medium/large-v3 |
 | `VIDEO_VISION_BROWSER` | `local` | `local` / `browserless` / `browserbase` / `steel` |
 
 完整配置参考：[中文文档](https://maim010.github.io/openclaw-video-vision/zh/configuration)
@@ -184,7 +203,7 @@ URL + Cookies + 代理（可选）
 欢迎贡献！特别期待以下方向：
 
 - **更多平台** — TikTok、Twitter/X、Vimeo、Dailymotion
-- **更智能的提取** — 场景切换检测、音频转录
+- **更智能的提取** — 场景切换检测、~~音频转录~~（已实现！）、关键帧检测
 - **模型适配器** — 本地模型（LLaVA、CogVLM）、更多服务商
 - **输出格式** — JSON 导出、SRT 字幕、Markdown 报告
 

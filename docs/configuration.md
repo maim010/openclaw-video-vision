@@ -14,6 +14,13 @@ All settings are controlled via environment variables or `~/.openclaw/openclaw.j
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | Seconds between extracted frames |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | Maximum frames per video |
 | `VIDEO_VISION_COOKIES_DIR` | — | Directory containing cookie files (see [Cookies](./cookies.md)) |
+| `VIDEO_VISION_LOW_RESOURCE` | `false` | Skip resource checks, disable transcription |
+| `VIDEO_VISION_TRANSCRIPTION` | `auto` | Transcription mode: `auto` / `on` / `off` (auto = on unless low-resource) |
+| `VIDEO_VISION_WHISPER_PATH` | `whisper-cli` | Path to whisper-cli binary |
+| `VIDEO_VISION_WHISPER_MODEL_PATH` | (auto-detect) | Full path to ggml model file |
+| `VIDEO_VISION_WHISPER_MODEL` | `medium` | Model name: tiny/base/small/medium/large-v3 |
+| `VIDEO_VISION_WHISPER_THREADS` | `0` (auto) | CPU threads for whisper (0 = cores/2) |
+| `VIDEO_VISION_WHISPER_LANGUAGE` | `auto` | Audio language hint |
 | `VIDEO_VISION_BROWSER` | `local` | Browser backend: `local` / `browserless` / `browserbase` / `steel` |
 | `VIDEO_VISION_BROWSERLESS_TOKEN` | — | Browserless API token |
 | `VIDEO_VISION_BROWSERBASE_API_KEY` | — | Browserbase API key |

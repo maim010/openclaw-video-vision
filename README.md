@@ -81,6 +81,10 @@ Dependencies: **Node.js >= 18**, **FFmpeg** (`brew install ffmpeg` / `apt instal
 
 Recommended: **yt-dlp** (`brew install yt-dlp` / `pip install yt-dlp`) for best results.
 
+For audio transcription (default on 16-core/16GB+ machines): **[whisper.cpp](https://github.com/ggml-org/whisper.cpp)**. See below for install steps.
+
+> **Low-resource mode:** On machines with fewer than 12 CPU cores or 14 GB RAM, set `VIDEO_VISION_LOW_RESOURCE=true` to skip transcription and resource checks.
+
 ### 2. Enable the skill
 
 Add to `~/.openclaw/openclaw.json`:
@@ -131,11 +135,22 @@ URL + Cookies + Proxy (optional)
 └────────────┬────────────┘     │ screenshot fallback      │
              │                  └─────────────┬────────────┘
              └──────────┬─────────────────────┘
+                   ┌────┴────┐
+                   │ FFmpeg  │ (parallel)
+                   ├─────────┤
+                   │ Frames  │  →  JPG files
+                   │ Audio   │  →  16kHz mono WAV
+                   └────┬────┘
+                        │
+                   ┌────┴──────────┐
+                   │ whisper-cli   │  →  Timestamped transcript
+                   │ (ggml-medium) │
+                   └────┬──────────┘
                         ▼
               ┌───────────────────┐
               │ Vision AI Model   │
-              │ (GPT-4o, Claude,  │
-              │  Gemini, etc.)    │
+              │ (frames +         │
+              │  transcript)      │
               └────────┬──────────┘
                        ▼
               Structured Summary
@@ -159,6 +174,7 @@ URL + Cookies + Proxy (optional)
 | **Cookies** | Netscape & JSON formats for login-restricted / age-gated content |
 | **Cloud Browsers** | Browserless, Browserbase, Steel — no local Chromium needed |
 | **Configurable** | Frame interval, max frames, extraction mode (`auto`/`ytdlp`/`browser`) |
+| **Audio transcription** | Local whisper.cpp — speech-to-text fed into vision prompt |
 | **Portable** | Works on macOS, Linux, Windows, Android/Termux (yt-dlp mode), CI/serverless |
 
 ---
@@ -176,6 +192,10 @@ All settings via environment variables or `~/.openclaw/openclaw.json`:
 | `VIDEO_VISION_PROXY` | — | Default proxy URL |
 | `VIDEO_VISION_FRAME_INTERVAL` | `5` | Seconds between frames |
 | `VIDEO_VISION_MAX_FRAMES` | `20` | Max frames per video |
+| `VIDEO_VISION_LOW_RESOURCE` | `false` | Skip resource checks, disable transcription |
+| `VIDEO_VISION_TRANSCRIPTION` | `auto` | `auto` / `on` / `off` |
+| `VIDEO_VISION_WHISPER_PATH` | `whisper-cli` | Path to whisper-cli binary |
+| `VIDEO_VISION_WHISPER_MODEL` | `medium` | Model: tiny/base/small/medium/large-v3 |
 | `VIDEO_VISION_BROWSER` | `local` | `local` / `browserless` / `browserbase` / `steel` |
 
 Full configuration reference: [Documentation](https://maim010.github.io/openclaw-video-vision/configuration)
@@ -187,7 +207,7 @@ Full configuration reference: [Documentation](https://maim010.github.io/openclaw
 Contributions welcome! Areas we'd love help with:
 
 - **New platforms** — TikTok, Twitter/X, Vimeo, Dailymotion
-- **Smarter extraction** — scene-change detection, audio transcription
+- **Smarter extraction** — scene-change detection, ~~audio transcription~~ (done!), keyframe detection
 - **Model adapters** — local models (LLaVA, CogVLM), more providers
 - **Output formats** — JSON export, SRT subtitles, markdown reports
 

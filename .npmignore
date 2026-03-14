@@ -1,0 +1,6 @@
+docs/
+examples/
+.github/
+.gitignore
+*.md
+!README.md

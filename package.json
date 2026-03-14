@@ -1,7 +1,7 @@
 {
   "name": "openclaw-video-vision",
-  "version": "1.0.0",
-  "description": "OpenClaw skill — crawl YouTube, Bilibili & other video platforms, extract key frames with FFmpeg, and summarize content using vision AI models",
+  "version": "1.1.0",
+  "description": "OpenClaw skill — crawl YouTube, Bilibili & other video platforms, extract key frames with FFmpeg, transcribe audio with whisper.cpp, and summarize content using vision AI models",
   "main": "src/index.js",
   "bin": {
     "video-vision": "src/index.js"
@@ -28,7 +28,10 @@
     "gpt-4o",
     "claude",
     "gemini",
-    "web-scraping"
+    "web-scraping",
+    "whisper",
+    "audio-transcription",
+    "speech-to-text"
   ],
   "author": "maim010 (https://github.com/maim010)",
   "license": "MIT",

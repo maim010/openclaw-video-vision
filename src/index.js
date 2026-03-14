@@ -34,7 +34,80 @@ const CONFIG = {
   browserbaseApiKey: process.env.VIDEO_VISION_BROWSERBASE_API_KEY || '',
   browserbaseProjectId: process.env.VIDEO_VISION_BROWSERBASE_PROJECT_ID || '',
   steelApiKey: process.env.VIDEO_VISION_STEEL_API_KEY || '',
+  // Transcription settings
+  lowResource: process.env.VIDEO_VISION_LOW_RESOURCE === 'true',
+  transcription: process.env.VIDEO_VISION_TRANSCRIPTION || 'auto', // 'auto' | 'on' | 'off'
+  whisperPath: process.env.VIDEO_VISION_WHISPER_PATH || 'whisper-cli',
+  whisperModelPath: process.env.VIDEO_VISION_WHISPER_MODEL_PATH || '',
+  whisperModel: process.env.VIDEO_VISION_WHISPER_MODEL || 'medium',
+  whisperThreads: parseInt(process.env.VIDEO_VISION_WHISPER_THREADS || '0', 10), // 0 = auto (cpu count / 2)
+  whisperLanguage: process.env.VIDEO_VISION_WHISPER_LANGUAGE || 'auto',
 };
+
+// ─── Resource check ──────────────────────────────────────────────────────────
+function checkResources() {
+  if (CONFIG.lowResource) return;
+
+  const cpuCount = os.cpus().length;
+  const totalMem = os.totalmem();
+  const minCores = 12;
+  const minMemGB = 14;
+
+  const errors = [];
+  if (cpuCount < minCores) {
+    errors.push(`CPU: ${cpuCount} cores found, ${minCores} required`);
+  }
+  if (totalMem < minMemGB * 1024 * 1024 * 1024) {
+    errors.push(`RAM: ${(totalMem / 1024 ** 3).toFixed(1)}GB found, ${minMemGB}GB required`);
+  }
+  if (errors.length > 0) {
+    throw new Error(
+      `Insufficient system resources for video-vision:\n` +
+      errors.map(e => `  - ${e}`).join('\n') + '\n\n' +
+      `video-vision requires ${minCores}+ CPU cores and ${minMemGB}GB+ RAM for local audio transcription.\n` +
+      `Set VIDEO_VISION_LOW_RESOURCE=true to run without transcription on lower-spec machines.`
+    );
+  }
+}
+
+// ─── Whisper availability check ──────────────────────────────────────────────
+function checkWhisper() {
+  return new Promise(resolve => {
+    execFile(CONFIG.whisperPath, ['--help'], { timeout: 5000 }, (err) => {
+      resolve(!err);
+    });
+  });
+}
+
+// ─── Resolve whisper model path ──────────────────────────────────────────────
+function resolveWhisperModel() {
+  // 1. Explicit path
+  if (CONFIG.whisperModelPath) {
+    if (fs.existsSync(CONFIG.whisperModelPath)) return CONFIG.whisperModelPath;
+    throw new Error(`Whisper model not found at: ${CONFIG.whisperModelPath}`);
+  }
+
+  const modelName = `ggml-${CONFIG.whisperModel}.bin`;
+
+  // 2. ~/.cache/whisper/ggml-{model}.bin
+  const cachePath = path.join(os.homedir(), '.cache', 'whisper', modelName);
+  if (fs.existsSync(cachePath)) return cachePath;
+
+  // 3. ./models/ggml-{model}.bin (whisper.cpp convention)
+  const localPath = path.join(process.cwd(), 'models', modelName);
+  if (fs.existsSync(localPath)) return localPath;
+
+  throw new Error(
+    `Whisper model "${modelName}" not found.\n` +
+    `Searched:\n` +
+    `  - ${cachePath}\n` +
+    `  - ${localPath}\n\n` +
+    `Download with:\n` +
+    `  mkdir -p ~/.cache/whisper\n` +
+    `  wget https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${modelName} -O ~/.cache/whisper/${modelName}\n\n` +
+    `Or set VIDEO_VISION_WHISPER_MODEL_PATH to the full path of your model file.`
+  );
+}
 
 // ─── Platform detection ───────────────────────────────────────────────────────
 function detectPlatform(url) {
@@ -344,6 +417,102 @@ async function extractFrames(videoUrl, duration, outputDir, headers = {}) {
   });
 }
 
+// ─── Audio extractor via FFmpeg ────────────────────────────────────────────────
+function extractAudio(videoSource, outputPath) {
+  return new Promise(resolve => {
+    const args = [
+      '-i', videoSource,
+      '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+      '-y', outputPath,
+    ];
+
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+
+    const timeout = setTimeout(() => { proc.kill(); }, 120000);
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.on('close', code => {
+      clearTimeout(timeout);
+      if (code === 0 && fs.existsSync(outputPath)) {
+        resolve(outputPath);
+      } else {
+        resolve(null);
+      }
+    });
+    proc.on('error', () => {
+      clearTimeout(timeout);
+      resolve(null);
+    });
+  });
+}
+
+// ─── Audio transcription via whisper-cli ──────────────────────────────────────
+async function transcribeAudio(wavPath) {
+  const modelPath = resolveWhisperModel();
+  const threads = CONFIG.whisperThreads || Math.max(1, Math.floor(os.cpus().length / 2));
+
+  const args = [
+    '-m', modelPath,
+    '-f', wavPath,
+    '-t', String(threads),
+    '-oj',
+  ];
+  if (CONFIG.whisperLanguage !== 'auto') {
+    args.push('-l', CONFIG.whisperLanguage);
+  }
+
+  return new Promise(resolve => {
+    const proc = spawn(CONFIG.whisperPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+
+    proc.stdout.on('data', d => { stdout += d.toString(); });
+    proc.on('close', code => {
+      if (code !== 0 || !stdout.trim()) return resolve(null);
+      try {
+        const json = JSON.parse(stdout);
+        const segments = (json.transcription || []).map(s => ({
+          start: s.offsets?.from != null ? s.offsets.from / 1000 : 0,
+          end: s.offsets?.to != null ? s.offsets.to / 1000 : 0,
+          text: (s.text || '').trim(),
+        }));
+        const text = segments.map(s => s.text).join(' ');
+        resolve({
+          text,
+          language: json.result?.language || CONFIG.whisperLanguage,
+          segments,
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    proc.on('error', () => resolve(null));
+  });
+}
+
+// ─── Format transcription for vision prompt ───────────────────────────────────
+function formatTranscription(transcription) {
+  if (!transcription || !transcription.segments || transcription.segments.length === 0) {
+    return transcription?.text || '';
+  }
+
+  const fmtTime = secs => {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  let result = '';
+  for (const seg of transcription.segments) {
+    const line = `[${fmtTime(seg.start)} - ${fmtTime(seg.end)}] ${seg.text}\n`;
+    if (result.length + line.length > 2000) {
+      result += '... (transcription truncated)\n';
+      break;
+    }
+    result += line;
+  }
+  return result.trim();
+}
+
 // ─── Screenshot fallback for platforms without direct video URL ───────────────
 async function captureScreenshots(page, platform, outputDir) {
   fs.mkdirSync(outputDir, { recursive: true });
@@ -396,7 +565,7 @@ async function captureScreenshots(page, platform, outputDir) {
 }
 
 // ─── Vision API call ──────────────────────────────────────────────────────────
-async function analyzeFramesWithVision(frames, title, description) {
+async function analyzeFramesWithVision(frames, title, description, transcription = null) {
   if (!CONFIG.apiKey) throw new Error('VIDEO_VISION_API_KEY is not set.');
 
   // Build messages: one text prompt + image contents
@@ -408,20 +577,23 @@ async function analyzeFramesWithVision(frames, title, description) {
     };
   });
 
+  const transcriptBlock = transcription ? `\nAudio Transcription:\n${formatTranscription(transcription)}\n` : '';
+  const hasAudio = !!transcription;
+
   const messages = [
     {
       role: 'user',
       content: [
         {
           type: 'text',
-          text: `You are analyzing key frames extracted from a video titled: "${title}".
+          text: `You are analyzing key frames${hasAudio ? ' and audio transcription' : ''} extracted from a video titled: "${title}".
 ${description ? `Description hint: ${description}\n` : ''}
 These ${frames.length} frames are sampled evenly across the video's duration.
-
+${transcriptBlock}
 Please provide:
-1. A concise overall summary (2-4 sentences) of what this video is about based on the visuals.
-2. A list of key visual moments or scenes (with approximate frame index).
-3. Main topics or subjects visible in the video (as tags).
+1. A concise overall summary (2-4 sentences) based on the visuals${hasAudio ? ' and audio content' : ''}.
+2. Key moments (with approximate frame index${hasAudio ? ' and timestamp' : ''}).
+3. Main topics (as tags).
 
 Format your response as:
 
@@ -484,7 +656,7 @@ TOPICS: <tag1>, <tag2>, <tag3>`,
 }
 
 // ─── Result formatter ─────────────────────────────────────────────────────────
-function formatResult(url, platform, meta, frameCount, interval, visionResult) {
+function formatResult(url, platform, meta, frameCount, interval, visionResult, transcriptionInfo = null) {
   const platformLabel = { youtube: 'YouTube', bilibili: 'Bilibili', generic: 'Web Video' }[platform];
   const lines = [
     `🎬 Video Summary: ${meta.title}`,
@@ -494,6 +666,12 @@ function formatResult(url, platform, meta, frameCount, interval, visionResult) {
     '',
     visionResult,
   ];
+  if (transcriptionInfo) {
+    lines.splice(3, 0,
+      `🎙️ Audio transcribed: ${transcriptionInfo.wordCount} words ` +
+      `(whisper-${CONFIG.whisperModel}, language: ${transcriptionInfo.language})`
+    );
+  }
   return lines.join('\n');
 }
 
@@ -520,9 +698,29 @@ function cleanupDir(dir) {
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 async function run({ url, proxy = null, cookieFile = null }) {
+  // Resource pre-check
+  checkResources();
+
+  // Determine if transcription is active
+  const transcriptionEnabled = CONFIG.transcription === 'on' ||
+    (CONFIG.transcription === 'auto' && !CONFIG.lowResource);
+
+  // Check whisper availability if transcription enabled
+  let canTranscribe = false;
+  if (transcriptionEnabled) {
+    canTranscribe = await checkWhisper();
+    if (!canTranscribe && !CONFIG.lowResource) {
+      throw new Error(
+        'whisper-cli not found. Install whisper.cpp or set VIDEO_VISION_LOW_RESOURCE=true.\n' +
+        'See: https://github.com/ggml-org/whisper.cpp'
+      );
+    }
+  }
+
   const platform = detectPlatform(url);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'video-vision-'));
   const framesDir = path.join(tmpDir, 'frames');
+  const audioPath = path.join(tmpDir, 'audio.wav');
   const mode = CONFIG.mode; // 'auto' | 'ytdlp' | 'browser'
 
   try {
@@ -534,6 +732,7 @@ async function run({ url, proxy = null, cookieFile = null }) {
 
       if (ytdlpInfo) {
         let frameInfo = null;
+        let videoSource = null;
 
         // Step 1a: Try FFmpeg with direct URL
         if (ytdlpInfo.videoUrl) {
@@ -554,6 +753,7 @@ async function run({ url, proxy = null, cookieFile = null }) {
               ffmpegHeaders,
             );
             if (frameInfo.frames.length === 0) frameInfo = null;
+            else videoSource = ytdlpInfo.videoUrl;
           } catch (_) {
             frameInfo = null;
           }
@@ -570,17 +770,31 @@ async function run({ url, proxy = null, cookieFile = null }) {
               framesDir,
             );
             if (frameInfo.frames.length === 0) frameInfo = null;
+            else videoSource = localVideo;
           } catch (_) {
             frameInfo = null;
           }
         }
 
         if (frameInfo && frameInfo.frames.length > 0) {
+          // Extract audio and transcribe in parallel with nothing (sequential after frames)
+          let transcription = null;
+          if (canTranscribe && videoSource) {
+            const audioExtracted = await extractAudio(videoSource, audioPath);
+            if (audioExtracted) {
+              transcription = await transcribeAudio(audioPath);
+            }
+          }
+
           const visionResult = await analyzeFramesWithVision(
-            frameInfo.frames, ytdlpInfo.title, ytdlpInfo.description
+            frameInfo.frames, ytdlpInfo.title, ytdlpInfo.description, transcription
           );
           const meta = { title: ytdlpInfo.title, duration: ytdlpInfo.duration, description: ytdlpInfo.description };
-          return formatResult(url, platform, meta, frameInfo.frames.length, frameInfo.adjustedInterval, visionResult);
+          const transcriptionInfo = transcription ? {
+            wordCount: transcription.text.split(/\s+/).length,
+            language: transcription.language || CONFIG.whisperLanguage,
+          } : null;
+          return formatResult(url, platform, meta, frameInfo.frames.length, frameInfo.adjustedInterval, visionResult, transcriptionInfo);
         }
       }
 
@@ -620,11 +834,13 @@ async function run({ url, proxy = null, cookieFile = null }) {
       }
 
       let frameInfo;
+      let videoSource = null;
 
       if (meta.videoUrl) {
         // Generic scraper found a direct video URL
         try {
           frameInfo = await extractFrames(meta.videoUrl, meta.duration, framesDir);
+          videoSource = meta.videoUrl;
         } catch (_) {
           frameInfo = await captureScreenshots(page, platform, framesDir);
         }
@@ -638,9 +854,22 @@ async function run({ url, proxy = null, cookieFile = null }) {
         return `⚠️ Could not extract frames from: ${url}\nTitle: ${meta.title}`;
       }
 
-      const visionResult = await analyzeFramesWithVision(frames, meta.title, meta.description);
+      // Transcribe audio if we have a video source (not screenshots)
+      let transcription = null;
+      if (canTranscribe && videoSource) {
+        const audioExtracted = await extractAudio(videoSource, audioPath);
+        if (audioExtracted) {
+          transcription = await transcribeAudio(audioPath);
+        }
+      }
 
-      return formatResult(url, platform, meta, frames.length, adjustedInterval, visionResult);
+      const visionResult = await analyzeFramesWithVision(frames, meta.title, meta.description, transcription);
+      const transcriptionInfo = transcription ? {
+        wordCount: transcription.text.split(/\s+/).length,
+        language: transcription.language || CONFIG.whisperLanguage,
+      } : null;
+
+      return formatResult(url, platform, meta, frames.length, adjustedInterval, visionResult, transcriptionInfo);
     } finally {
       if (browser) await browser.close().catch(() => {});
     }
@@ -666,4 +895,4 @@ if (require.main === module) {
     .catch(err => { console.error('Error:', err.message); process.exit(1); });
 }
 
-module.exports = { run, detectPlatform, loadCookies, getVideoWithYtDlp, downloadWithYtDlp };
+module.exports = { run, detectPlatform, loadCookies, getVideoWithYtDlp, downloadWithYtDlp, extractAudio, transcribeAudio, checkResources };
