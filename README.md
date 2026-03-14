@@ -72,6 +72,10 @@ TOPICS: GPT-5.4, OpenClaw, AI Agent, Computer Control, OpenAI, Codex,
 ### 1. Install
 
 ```bash
+# Option A: npm (recommended)
+npm install @maim010/openclaw-video-vision@latest
+
+# Option B: git clone
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
 cd ~/.openclaw/workspace/skills/video-vision
 npm install

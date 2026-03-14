@@ -19,7 +19,10 @@
 ## Setup
 
 ```bash
-# Clone
+# Option A: npm (recommended)
+npm install @maim010/openclaw-video-vision@latest
+
+# Option B: Clone
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
 cd ~/.openclaw/workspace/skills/video-vision
 

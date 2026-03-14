@@ -19,7 +19,10 @@
 ## 安装步骤
 
 ```bash
-# 克隆仓库
+# 方式 A：npm（推荐）
+npm install @maim010/openclaw-video-vision@latest
+
+# 方式 B：克隆仓库
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
 cd ~/.openclaw/workspace/skills/video-vision
 
