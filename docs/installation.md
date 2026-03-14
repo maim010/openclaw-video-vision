@@ -19,8 +19,10 @@
 ## Setup
 
 ```bash
-# Option A: npm (recommended)
-npm install @maim010/openclaw-video-vision@latest
+# Option A: npm via GitHub Packages
+npm install @maim010/openclaw-video-vision@latest \
+  --registry=https://npm.pkg.github.com \
+  --//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
 
 # Option B: Clone
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision

@@ -19,8 +19,10 @@
 ## 安装步骤
 
 ```bash
-# 方式 A：npm（推荐）
-npm install @maim010/openclaw-video-vision@latest
+# 方式 A：npm（通过 GitHub Packages）
+npm install @maim010/openclaw-video-vision@latest \
+  --registry=https://npm.pkg.github.com \
+  --//npm.pkg.github.com/:_authToken=你的GitHub_Token
 
 # 方式 B：克隆仓库
 git clone https://github.com/maim010/openclaw-video-vision.git ~/.openclaw/workspace/skills/video-vision
