@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-video-vision",
+  "name": "@maim010/openclaw-video-vision",
   "version": "1.1.0",
   "description": "OpenClaw skill — crawl YouTube, Bilibili & other video platforms, extract key frames with FFmpeg, transcribe audio with whisper.cpp, and summarize content using vision AI models",
   "main": "src/index.js",
