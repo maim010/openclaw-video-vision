@@ -8,7 +8,7 @@
 | FFmpeg | 是 | `brew install ffmpeg` / `apt install ffmpeg` |
 | 视觉 API 密钥 | 是 | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) / 等 |
 | yt-dlp | 推荐 | `brew install yt-dlp` / `pip install yt-dlp` |
-| whisper.cpp | 可选（转录） | 参见下方 [Whisper.cpp 安装](#whispercpp-安装) |
+| whisper.cpp | 可选（转录） | 参见下方 [Whisper.cpp 安装](#whisper-cpp-安装) |
 | playwright-core | 可选 | `npm install playwright-core` |
 | Chromium | 可选（仅浏览器路径） | `npx playwright-core install chromium` |
 
