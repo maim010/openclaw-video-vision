@@ -8,7 +8,7 @@
 | FFmpeg | Yes | `brew install ffmpeg` / `apt install ffmpeg` |
 | Vision API Key | Yes | [OpenAI](https://platform.openai.com) / [Anthropic](https://console.anthropic.com) / etc. |
 | yt-dlp | Recommended | `brew install yt-dlp` / `pip install yt-dlp` |
-| whisper.cpp | Optional (transcription) | See [Whisper.cpp Setup](#whispercp-setup) below |
+| whisper.cpp | Optional (transcription) | See [Whisper.cpp Setup](#whisper-cpp-setup) below |
 | playwright-core | Optional | `npm install playwright-core` |
 | Chromium | Optional (browser path only) | `npx playwright-core install chromium` |
 
