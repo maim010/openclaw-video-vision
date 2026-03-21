@@ -1,89 +1,70 @@
-name: Windows 游戏环境 + Sunshine 串流
+name: Windows RDP 远程桌面
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # 手动触发
 
 jobs:
-  gaming-windows:
+  rdp:
     runs-on: windows-11-arm
     steps:
-      - name: 显示系统信息
-        run: systeminfo
-      
-      # ---------- 启用 RDP（备用）----------
-      - name: 启用 RDP
+      - name: 启用远程桌面
         run: |
+          # 开启远程桌面服务
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          # 允许防火墙通过
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          $password = ConvertTo-SecureString "YourGamePass123!" -AsPlainText -Force
+          # 设置当前用户密码（用于登录）
+          $password = ConvertTo-SecureString "YourRDPassword123!" -AsPlainText -Force
           Set-LocalUser -Name $env:USERNAME -Password $password
+          Write-Host "远程桌面已启用，用户名: $env:USERNAME，密码: YourRDPassword123!"
 
-      # ---------- 下载 Sunshine ----------
-      - name: 下载 Sunshine
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/LizardByte/Sunshine/releases/download/v2025.923.33222/Sunshine-Windows-Installer.exe" -OutFile "sunshine_installer.exe"
-          # 添加防火墙规则
-          netsh advfirewall firewall add rule name="Sunshine" dir=in action=allow protocol=TCP localport=47984,47989,48010
-          netsh advfirewall firewall add rule name="Sunshine UDP" dir=in action=allow protocol=UDP localport=47998,47999,48000,48002,48010
-
-      # ---------- 下载 ngrok ----------
       - name: 下载 ngrok
         run: |
           Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-arm64.zip" -OutFile "ngrok.zip"
           Expand-Archive -Path ngrok.zip -DestinationPath .
           Remove-Item ngrok.zip
 
-      # ---------- 启动 Sunshine ----------
-      - name: 启动 Sunshine
-        run: |
-          Start-Process -FilePath "C:\Sunshine\sunshine.exe" -WindowStyle Hidden
-          Start-Sleep -Seconds 5
-
-      # ---------- 启动 ngrok（映射 Sunshine 的 Web 控制台 + 串流端口）----------
-      - name: 启动 ngrok
+      - name: 启动 ngrok 隧道
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
+          # 配置 ngrok 认证（如有 token）
           if ($env:NGROK_AUTH_TOKEN) {
             .\ngrok config add-authtoken $env:NGROK_AUTH_TOKEN
           }
-          # 映射 Sunshine Web 控制台端口 47990
-          Start-Process -NoNewWindow .\ngrok -ArgumentList "http 47990"
-          # 映射串流端口 47989（Moonlight 需要）
-          Start-Process -NoNewWindow .\ngrok -ArgumentList "tcp 47989"
-          Start-Sleep -Seconds 5
+          # 映射 RDP 端口 3389
+          Start-Process -NoNewWindow .\ngrok -ArgumentList "tcp 3389"
+          Start-Sleep -Seconds 10
 
-      # ---------- 显示连接信息 ----------
       - name: 显示连接信息
         run: |
-          Write-Host "===================================================="
-          Write-Host "RDP 连接信息（备用）："
-          Write-Host "  用户名：$env:USERNAME"
-          Write-Host "  密码：YourGamePass123!"
-          
+          Write-Host "等待 ngrok 获取地址..."
+          Start-Sleep -Seconds 5
           $ngrokApi = "http://127.0.0.1:4040/api/tunnels"
           try {
             $tunnels = Invoke-RestMethod -Uri $ngrokApi
-            $web = $tunnels.tunnels | Where-Object { $_.proto -eq "https" -and $_.config.addr -like "*47990*" }
-            if ($web) {
-              Write-Host "`nSunshine Web 控制台：" $web.public_url -ForegroundColor Green
+            $tcp = $tunnels.tunnels | Where-Object { $_.proto -eq "tcp" }
+            if ($tcp) {
+              $addr = $tcp.public_url -replace "tcp://", ""
+              Write-Host "===================================================="
+              Write-Host "远程桌面连接信息："
+              Write-Host "  地址：$addr"
+              Write-Host "  用户名：$env:USERNAME"
+              Write-Host "  密码：YourRDPassword123!"
+              Write-Host "===================================================="
+              Write-Host "请使用 Windows 远程桌面连接 (mstsc) 输入上述地址和凭据。"
+              Write-Host "此虚拟机将在 6 小时后自动关闭。"
+            } else {
+              Write-Host "未获取到隧道，请检查 ngrok 是否正常运行。" -ForegroundColor Red
             }
           } catch {
-            Write-Host "无法获取 ngrok 地址" -ForegroundColor Yellow
+            Write-Host "无法连接 ngrok API，请稍后在日志中手动查看。" -ForegroundColor Yellow
           }
-          
-          Write-Host "`n===================================================="
-          Write-Host "Moonlight 连接步骤："
-          Write-Host "  1. 先通过 RDP 连接到这台机器"
-          Write-Host "  2. 在桌面上打开 Sunshine 控制台（http://127.0.0.1:47990）"
-          Write-Host "  3. 设置用户名和密码（首次访问需要）"
-          Write-Host "  4. 在 Moonlight 客户端添加此机器的 IP（通过 ngrok 获取）"
-          Write-Host "  5. 配对成功后即可串流游戏"
-          Write-Host "===================================================="
 
-      - name: 保持活跃
+      - name: 保持运行（防止退出）
         run: |
+          Write-Host "保持虚拟机运行，避免因无输出而超时。"
           while ($true) {
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 虚拟机运行中，可通过 RDP 连接配置 Sunshine"
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 远程桌面可用，请连接。"
             Start-Sleep -Seconds 300
           }
