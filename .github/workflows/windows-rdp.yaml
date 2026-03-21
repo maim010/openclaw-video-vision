@@ -14,12 +14,33 @@ jobs:
           $password = ConvertTo-SecureString "YourRDPassword123!" -AsPlainText -Force
           Set-LocalUser -Name $env:USERNAME -Password $password
           Write-Host "远程桌面已启用，用户名: $env:USERNAME，密码: YourRDPassword123!"
-
-      - name: 下载 zrok
+          
+      - name: 下载并安装 zrok
         run: |
-          Invoke-WebRequest -Uri "https://github.com/openziti/zrok/releases/latest/download/zrok_windows_arm64.zip" -OutFile "zrok.zip"
+          # 通过 GitHub API 获取最新 release 的 assets 信息
+          $apiUrl = "https://api.github.com/repos/openziti/zrok/releases/latest"
+          $release = Invoke-RestMethod -Uri $apiUrl
+        
+          # 找到 Windows ARM64 的压缩包（文件名通常包含 windows_arm64）
+          $asset = $release.assets | Where-Object { $_.name -like "*windows*arm64*" -and $_.name -like "*.zip" } | Select-Object -First 1
+        
+          if (-not $asset) {
+            Write-Host "未找到 Windows ARM64 的安装包，请检查 zrok 发布页面" -ForegroundColor Red
+            exit 1
+          }
+        
+          Write-Host "找到文件：$($asset.name)"
+          Write-Host "下载地址：$($asset.browser_download_url)"
+        
+          # 下载文件
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "zrok.zip"
+        
+          # 解压
           Expand-Archive -Path zrok.zip -DestinationPath .
           Remove-Item zrok.zip
+        
+          Write-Host "zrok 安装完成"
+        
 
       - name: 配置 zrok
         env:
