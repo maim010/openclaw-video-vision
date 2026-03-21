@@ -5,7 +5,7 @@ on:
 
 jobs:
   rdp:
-    runs-on: windows-2022          # 改用 x64 Windows 运行器
+    runs-on: windows-2022
     steps:
       - name: 启用远程桌面
         run: |
@@ -21,15 +21,16 @@ jobs:
           Expand-Archive -Path bore.zip -DestinationPath .
           Remove-Item bore.zip
 
-      - name: 启动 bore 隧道
+      - name: 启动 bore 并保持运行
         run: |
-          Start-Process -NoNewWindow .\bore.exe -ArgumentList "local 3389 --to bore.pub"
+          # 启动 bore 并将输出重定向到文件
+          Start-Process -NoNewWindow .\bore.exe -ArgumentList "local 3389 --to bore.pub" -RedirectStandardOutput "bore_out.txt" -RedirectStandardError "bore_err.txt"
           Start-Sleep -Seconds 10
-          Write-Host "等待 bore 分配端口..."
-          # 获取 bore 输出
-          $output = & .\bore.exe local 3389 --to bore.pub 2>&1
+          # 读取输出文件
+          $output = Get-Content "bore_out.txt", "bore_err.txt" -ErrorAction SilentlyContinue
+          Write-Host "bore 输出："
           $output
-          # 尝试从输出中提取地址（bore 会输出类似 "listening at bore.pub:12345"）
+          # 提取地址
           $match = $output | Select-String -Pattern 'bore\.pub:(\d+)'
           if ($match) {
             $port = $match.Matches.Groups[1].Value
@@ -43,9 +44,7 @@ jobs:
           } else {
             Write-Host "未能获取 bore 地址，请检查上方输出" -ForegroundColor Yellow
           }
-
-      - name: 保持运行
-        run: |
+          # 保持运行（防止作业退出）
           while ($true) {
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 远程桌面可用，请连接。"
             Start-Sleep -Seconds 300
