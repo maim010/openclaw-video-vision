@@ -7,19 +7,16 @@ jobs:
   rdp:
     runs-on: windows-2022
     steps:
-      - name: 创建专用 RDP 用户
+      - name: 创建管理员 RDP 用户
         run: |
           $rdpUser = "rdpuser"
           $rdpPass = "RdpPass123!"
           net user $rdpUser $rdpPass /add
+          net localgroup "Administrators" $rdpUser /add        # 加入管理员组
           net localgroup "Remote Desktop Users" $rdpUser /add
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          Write-Host "===================================================="
-          Write-Host "远程桌面凭据："
-          Write-Host "  用户名：$rdpUser"
-          Write-Host "  密码：$rdpPass"
-          Write-Host "===================================================="
+          Write-Host "管理员用户 $rdpUser 已创建，密码 $rdpPass"
 
       - name: 下载 bore
         run: |
