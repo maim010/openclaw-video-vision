@@ -7,13 +7,19 @@ jobs:
   rdp:
     runs-on: windows-2022
     steps:
-      - name: 启用远程桌面
+      - name: 创建专用 RDP 用户
         run: |
+          $rdpUser = "rdpuser"
+          $rdpPass = "RdpPass123!"
+          net user $rdpUser $rdpPass /add
+          net localgroup "Remote Desktop Users" $rdpUser /add
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          $password = ConvertTo-SecureString "YourRDPassword123!" -AsPlainText -Force
-          Set-LocalUser -Name $env:USERNAME -Password $password
-          Write-Host "远程桌面已启用，用户名: $env:USERNAME，密码: YourRDPassword123!"
+          Write-Host "===================================================="
+          Write-Host "远程桌面凭据："
+          Write-Host "  用户名：$rdpUser"
+          Write-Host "  密码：$rdpPass"
+          Write-Host "===================================================="
 
       - name: 下载 bore
         run: |
@@ -23,28 +29,24 @@ jobs:
 
       - name: 启动 bore 并保持运行
         run: |
-          # 启动 bore 并将输出重定向到文件
-          Start-Process -NoNewWindow .\bore.exe -ArgumentList "local 3389 --to bore.pub" -RedirectStandardOutput "bore_out.txt" -RedirectStandardError "bore_err.txt"
+          Start-Process -NoNewWindow .\bore.exe -ArgumentList "local 3389 --to bore.pub" -RedirectStandardOutput "bore_out.txt"
           Start-Sleep -Seconds 10
-          # 读取输出文件
-          $output = Get-Content "bore_out.txt", "bore_err.txt" -ErrorAction SilentlyContinue
+          $output = Get-Content "bore_out.txt" -ErrorAction SilentlyContinue
           Write-Host "bore 输出："
           $output
-          # 提取地址
           $match = $output | Select-String -Pattern 'bore\.pub:(\d+)'
           if ($match) {
             $port = $match.Matches.Groups[1].Value
             $addr = "bore.pub:$port"
             Write-Host "===================================================="
-            Write-Host "远程桌面连接信息："
+            Write-Host "连接信息："
             Write-Host "  地址：$addr"
-            Write-Host "  用户名：$env:USERNAME"
-            Write-Host "  密码：YourRDPassword123!"
+            Write-Host "  用户名：rdpuser"
+            Write-Host "  密码：RdpPass123!"
             Write-Host "===================================================="
           } else {
             Write-Host "未能获取 bore 地址，请检查上方输出" -ForegroundColor Yellow
           }
-          # 保持运行（防止作业退出）
           while ($true) {
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 远程桌面可用，请连接。"
             Start-Sleep -Seconds 300
