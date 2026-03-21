@@ -1,11 +1,11 @@
-name: Windows RDP 远程桌面 (zrok)
+name: Windows RDP 远程桌面 (x64 + bore)
 
 on:
-  workflow_dispatch:   # 手动触发
+  workflow_dispatch:
 
 jobs:
   rdp:
-    runs-on: windows-11-arm
+    runs-on: windows-2022          # 改用 x64 Windows 运行器
     steps:
       - name: 启用远程桌面
         run: |
@@ -14,73 +14,38 @@ jobs:
           $password = ConvertTo-SecureString "YourRDPassword123!" -AsPlainText -Force
           Set-LocalUser -Name $env:USERNAME -Password $password
           Write-Host "远程桌面已启用，用户名: $env:USERNAME，密码: YourRDPassword123!"
-          
-      - name: 下载并安装 zrok
-        run: |
-          # 通过 GitHub API 获取最新 release 的 assets 信息
-          $apiUrl = "https://api.github.com/repos/openziti/zrok/releases/latest"
-          $release = Invoke-RestMethod -Uri $apiUrl
-        
-          # 找到 Windows ARM64 的压缩包（文件名通常包含 windows_arm64）
-          $asset = $release.assets | Where-Object { $_.name -like "*windows*arm64*" -and $_.name -like "*.zip" } | Select-Object -First 1
-        
-          if (-not $asset) {
-            Write-Host "未找到 Windows ARM64 的安装包，请检查 zrok 发布页面" -ForegroundColor Red
-            exit 1
-          }
-        
-          Write-Host "找到文件：$($asset.name)"
-          Write-Host "下载地址：$($asset.browser_download_url)"
-        
-          # 下载文件
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "zrok.zip"
-        
-          # 解压
-          Expand-Archive -Path zrok.zip -DestinationPath .
-          Remove-Item zrok.zip
-        
-          Write-Host "zrok 安装完成"
-        
 
-      - name: 配置 zrok
-        env:
-          ZROK_TOKEN: ${{ secrets.ZROK_TOKEN }}
+      - name: 下载 bore
         run: |
-          if ($env:ZROK_TOKEN) {
-            .\zrok.exe enable $env:ZROK_TOKEN --headless
-            Write-Host "zrok 已启用"
-          } else {
-            Write-Host "未设置 ZROK_TOKEN，请先注册 zrok 并添加 secret" -ForegroundColor Red
-            exit 1
-          }
+          Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-pc-windows-msvc.zip" -OutFile "bore.zip"
+          Expand-Archive -Path bore.zip -DestinationPath .
+          Remove-Item bore.zip
 
-      - name: 启动 zrok 隧道
+      - name: 启动 bore 隧道
         run: |
-          # 启动 TCP 隧道，将本地 3389 端口映射到公网
-          $process = Start-Process -NoNewWindow -PassThru .\zrok.exe -ArgumentList "share public tcp:3389 --headless" -RedirectStandardOutput "zrok_output.txt"
+          Start-Process -NoNewWindow .\bore.exe -ArgumentList "local 3389 --to bore.pub"
           Start-Sleep -Seconds 10
-          # 从输出中提取地址
-          $output = Get-Content "zrok_output.txt"
-          Write-Host "zrok 输出："
+          Write-Host "等待 bore 分配端口..."
+          # 获取 bore 输出
+          $output = & .\bore.exe local 3389 --to bore.pub 2>&1
           $output
-          # 尝试提取 TCP 地址
-          $tcpAddr = ($output | Select-String -Pattern 'tcp://[^ ]+').Matches.Value
-          if ($tcpAddr) {
-            $cleanAddr = $tcpAddr -replace 'tcp://', ''
+          # 尝试从输出中提取地址（bore 会输出类似 "listening at bore.pub:12345"）
+          $match = $output | Select-String -Pattern 'bore\.pub:(\d+)'
+          if ($match) {
+            $port = $match.Matches.Groups[1].Value
+            $addr = "bore.pub:$port"
             Write-Host "===================================================="
             Write-Host "远程桌面连接信息："
-            Write-Host "  地址：$cleanAddr"
+            Write-Host "  地址：$addr"
             Write-Host "  用户名：$env:USERNAME"
             Write-Host "  密码：YourRDPassword123!"
             Write-Host "===================================================="
-            Write-Host "请使用 Windows 远程桌面连接 (mstsc) 输入上述地址和凭据。"
           } else {
-            Write-Host "未获取到 TCP 地址，请检查 zrok 是否正常启动。" -ForegroundColor Red
+            Write-Host "未能获取 bore 地址，请检查上方输出" -ForegroundColor Yellow
           }
 
       - name: 保持运行
         run: |
-          Write-Host "保持虚拟机运行，避免因无输出而超时。"
           while ($true) {
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 远程桌面可用，请连接。"
             Start-Sleep -Seconds 300
