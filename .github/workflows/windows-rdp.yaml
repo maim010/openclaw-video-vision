@@ -1,7 +1,7 @@
-name: Windows 游戏环境 + RDP/Parsec
+name: Windows 游戏环境 + Sunshine 串流
 
 on:
-  workflow_dispatch:    # 手动触发
+  workflow_dispatch:
 
 jobs:
   gaming-windows:
@@ -10,99 +10,83 @@ jobs:
       - name: 显示系统信息
         run: systeminfo
 
-      # ---------- 启用远程桌面 ----------
+      # ---------- 启用 RDP（备用）----------
       - name: 启用 RDP
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          # 设置当前用户密码（修改为你的密码）
           $password = ConvertTo-SecureString "YourGamePass123!" -AsPlainText -Force
           Set-LocalUser -Name $env:USERNAME -Password $password
 
-      # ---------- 安装 Parsec（可选，更流畅的游戏远程） ----------
-      - name: 安装 Parsec
+      # ---------- 下载 Sunshine ----------
+      - name: 安装 Sunshine
         run: |
-          # 下载 Parsec 安装程序
-          Invoke-WebRequest -Uri "https://builds.parsecgaming.com/package/parsec-windows-arm64.exe" -OutFile "parsec_installer.exe"
-          # 静默安装
-          Start-Process -FilePath ".\parsec_installer.exe" -ArgumentList "/S" -Wait
-          # 删除安装包
-          Remove-Item "parsec_installer.exe"
+          # 下载 Sunshine 安装包（ARM64 版本）
+          Invoke-WebRequest -Uri "https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-windows-arm64.zip" -OutFile "sunshine.zip"
+          Expand-Archive -Path sunshine.zip -DestinationPath "C:\Sunshine"
+          Remove-Item sunshine.zip
+          # 添加防火墙规则
+          netsh advfirewall firewall add rule name="Sunshine" dir=in action=allow protocol=TCP localport=47984,47989,48010
+          netsh advfirewall firewall add rule name="Sunshine UDP" dir=in action=allow protocol=UDP localport=47998,47999,48000,48002,48010
 
-      # ---------- 安装常用游戏平台（可选） ----------
-      - name: 安装 Steam（如果玩 Steam 游戏）
-        run: |
-          Invoke-WebRequest -Uri "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe" -OutFile "SteamSetup.exe"
-          Start-Process -FilePath ".\SteamSetup.exe" -ArgumentList "/S" -Wait
-          Remove-Item "SteamSetup.exe"
-
-      # 可以在这里添加其他平台的安装（Epic、GOG 等）
-
-      # ---------- 下载 ngrok（用于 RDP 内网穿透） ----------
+      # ---------- 下载 ngrok ----------
       - name: 下载 ngrok
         run: |
           Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-arm64.zip" -OutFile "ngrok.zip"
           Expand-Archive -Path ngrok.zip -DestinationPath .
           Remove-Item ngrok.zip
 
-      # ---------- 启动 ngrok（映射 RDP 端口） ----------
-      - name: 启动 ngrok（RDP 隧道）
+      # ---------- 启动 Sunshine ----------
+      - name: 启动 Sunshine
+        run: |
+          Start-Process -FilePath "C:\Sunshine\sunshine.exe" -WindowStyle Hidden
+          Start-Sleep -Seconds 5
+
+      # ---------- 启动 ngrok（映射 Sunshine 的 Web 控制台 + 串流端口）----------
+      - name: 启动 ngrok
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
           if ($env:NGROK_AUTH_TOKEN) {
             .\ngrok config add-authtoken $env:NGROK_AUTH_TOKEN
           }
-          Start-Process -NoNewWindow .\ngrok -ArgumentList "tcp 3389"
-          # 等待 ngrok 启动
+          # 映射 Sunshine Web 控制台端口 47990
+          Start-Process -NoNewWindow .\ngrok -ArgumentList "http 47990"
+          # 映射串流端口 47989（Moonlight 需要）
+          Start-Process -NoNewWindow .\ngrok -ArgumentList "tcp 47989"
           Start-Sleep -Seconds 5
-
-      # ---------- 启动 Parsec 服务 ----------
-      - name: 启动 Parsec 服务（可选）
-        run: |
-          # Parsec 安装后默认会开机自启，这里手动启动确保运行
-          Start-Service -Name "Parsec" -ErrorAction SilentlyContinue
-          # 显示 Parsec 的 peer ID（用于连接）
-          Start-Sleep -Seconds 2
-          $parsecPath = "$env:LOCALAPPDATA\Parsec\parsec.exe"
-          if (Test-Path $parsecPath) {
-            & $parsecPath --get-peer-id | Out-String | Write-Host
-          }
 
       # ---------- 显示连接信息 ----------
       - name: 显示连接信息
         run: |
           Write-Host "===================================================="
-          Write-Host "RDP 连接信息："
+          Write-Host "RDP 连接信息（备用）："
           Write-Host "  用户名：$env:USERNAME"
           Write-Host "  密码：YourGamePass123!"
-          # 获取 ngrok RDP 地址
+          
           $ngrokApi = "http://127.0.0.1:4040/api/tunnels"
           try {
             $tunnels = Invoke-RestMethod -Uri $ngrokApi
-            $tcp = $tunnels.tunnels | Where-Object { $_.proto -eq "tcp" }
-            if ($tcp) {
-              $addr = $tcp.public_url -replace "tcp://", ""
-              Write-Host "  RDP 地址：$addr" -ForegroundColor Green
+            $web = $tunnels.tunnels | Where-Object { $_.proto -eq "https" -and $_.config.addr -like "*47990*" }
+            if ($web) {
+              Write-Host "`nSunshine Web 控制台：" $web.public_url -ForegroundColor Green
             }
           } catch {
-            Write-Host "  RDP 地址：无法获取，请稍后查看 ngrok 日志" -ForegroundColor Yellow
+            Write-Host "无法获取 ngrok 地址" -ForegroundColor Yellow
           }
-
-          Write-Host "----------------------------------------------------"
-          Write-Host "Parsec 连接说明："
-          Write-Host "  1. 在你的本地电脑安装 Parsec"
-          Write-Host "  2. 登录同一个 Parsec 账号"
-          Write-Host "  3. 在 Parsec 客户端中可以看到这台机器（名称类似 GITHUB-ACTIONS）"
-          Write-Host "  4. 点击连接即可获得更流畅的游戏画面"
-          Write-Host "----------------------------------------------------"
-          Write-Host "注意：虚拟机将在 6 小时后自动关闭！"
+          
+          Write-Host "`n===================================================="
+          Write-Host "Moonlight 连接步骤："
+          Write-Host "  1. 先通过 RDP 连接到这台机器"
+          Write-Host "  2. 在桌面上打开 Sunshine 控制台（http://127.0.0.1:47990）"
+          Write-Host "  3. 设置用户名和密码（首次访问需要）"
+          Write-Host "  4. 在 Moonlight 客户端添加此机器的 IP（通过 ngrok 获取）"
+          Write-Host "  5. 配对成功后即可串流游戏"
           Write-Host "===================================================="
 
-      # ---------- 保持运行（防止退出） ----------
       - name: 保持活跃
         run: |
           while ($true) {
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 虚拟机运行中，可通过 RDP 或 Parsec 连接"
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 虚拟机运行中，可通过 RDP 连接配置 Sunshine"
             Start-Sleep -Seconds 300
           }
