@@ -1,4 +1,4 @@
-name: Windows RDP 远程桌面
+name: Windows RDP 远程桌面 (zrok)
 
 on:
   workflow_dispatch:   # 手动触发
@@ -9,59 +9,55 @@ jobs:
     steps:
       - name: 启用远程桌面
         run: |
-          # 开启远程桌面服务
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-          # 允许防火墙通过
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          # 设置当前用户密码（用于登录）
           $password = ConvertTo-SecureString "YourRDPassword123!" -AsPlainText -Force
           Set-LocalUser -Name $env:USERNAME -Password $password
           Write-Host "远程桌面已启用，用户名: $env:USERNAME，密码: YourRDPassword123!"
 
-      - name: 下载 ngrok
+      - name: 下载 zrok
         run: |
-          Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-arm64.zip" -OutFile "ngrok.zip"
-          Expand-Archive -Path ngrok.zip -DestinationPath .
-          Remove-Item ngrok.zip
+          Invoke-WebRequest -Uri "https://github.com/openziti/zrok/releases/latest/download/zrok_windows_arm64.zip" -OutFile "zrok.zip"
+          Expand-Archive -Path zrok.zip -DestinationPath .
+          Remove-Item zrok.zip
 
-      - name: 启动 ngrok 隧道
+      - name: 配置 zrok
         env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+          ZROK_TOKEN: ${{ secrets.ZROK_TOKEN }}
         run: |
-          # 配置 ngrok 认证（如有 token）
-          if ($env:NGROK_AUTH_TOKEN) {
-            .\ngrok config add-authtoken $env:NGROK_AUTH_TOKEN
+          if ($env:ZROK_TOKEN) {
+            .\zrok.exe enable $env:ZROK_TOKEN --headless
+            Write-Host "zrok 已启用"
+          } else {
+            Write-Host "未设置 ZROK_TOKEN，请先注册 zrok 并添加 secret" -ForegroundColor Red
+            exit 1
           }
-          # 映射 RDP 端口 3389
-          Start-Process -NoNewWindow .\ngrok -ArgumentList "tcp 3389"
+
+      - name: 启动 zrok 隧道
+        run: |
+          # 启动 TCP 隧道，将本地 3389 端口映射到公网
+          $process = Start-Process -NoNewWindow -PassThru .\zrok.exe -ArgumentList "share public tcp:3389 --headless" -RedirectStandardOutput "zrok_output.txt"
           Start-Sleep -Seconds 10
-
-      - name: 显示连接信息
-        run: |
-          Write-Host "等待 ngrok 获取地址..."
-          Start-Sleep -Seconds 5
-          $ngrokApi = "http://127.0.0.1:4040/api/tunnels"
-          try {
-            $tunnels = Invoke-RestMethod -Uri $ngrokApi
-            $tcp = $tunnels.tunnels | Where-Object { $_.proto -eq "tcp" }
-            if ($tcp) {
-              $addr = $tcp.public_url -replace "tcp://", ""
-              Write-Host "===================================================="
-              Write-Host "远程桌面连接信息："
-              Write-Host "  地址：$addr"
-              Write-Host "  用户名：$env:USERNAME"
-              Write-Host "  密码：YourRDPassword123!"
-              Write-Host "===================================================="
-              Write-Host "请使用 Windows 远程桌面连接 (mstsc) 输入上述地址和凭据。"
-              Write-Host "此虚拟机将在 6 小时后自动关闭。"
-            } else {
-              Write-Host "未获取到隧道，请检查 ngrok 是否正常运行。" -ForegroundColor Red
-            }
-          } catch {
-            Write-Host "无法连接 ngrok API，请稍后在日志中手动查看。" -ForegroundColor Yellow
+          # 从输出中提取地址
+          $output = Get-Content "zrok_output.txt"
+          Write-Host "zrok 输出："
+          $output
+          # 尝试提取 TCP 地址
+          $tcpAddr = ($output | Select-String -Pattern 'tcp://[^ ]+').Matches.Value
+          if ($tcpAddr) {
+            $cleanAddr = $tcpAddr -replace 'tcp://', ''
+            Write-Host "===================================================="
+            Write-Host "远程桌面连接信息："
+            Write-Host "  地址：$cleanAddr"
+            Write-Host "  用户名：$env:USERNAME"
+            Write-Host "  密码：YourRDPassword123!"
+            Write-Host "===================================================="
+            Write-Host "请使用 Windows 远程桌面连接 (mstsc) 输入上述地址和凭据。"
+          } else {
+            Write-Host "未获取到 TCP 地址，请检查 zrok 是否正常启动。" -ForegroundColor Red
           }
 
-      - name: 保持运行（防止退出）
+      - name: 保持运行
         run: |
           Write-Host "保持虚拟机运行，避免因无输出而超时。"
           while ($true) {
