@@ -1,0 +1,108 @@
+name: Windows 游戏环境 + RDP/Parsec
+
+on:
+  workflow_dispatch:    # 手动触发
+
+jobs:
+  gaming-windows:
+    runs-on: windows-11-arm
+    steps:
+      - name: 显示系统信息
+        run: systeminfo
+
+      # ---------- 启用远程桌面 ----------
+      - name: 启用 RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          # 设置当前用户密码（修改为你的密码）
+          $password = ConvertTo-SecureString "YourGamePass123!" -AsPlainText -Force
+          Set-LocalUser -Name $env:USERNAME -Password $password
+
+      # ---------- 安装 Parsec（可选，更流畅的游戏远程） ----------
+      - name: 安装 Parsec
+        run: |
+          # 下载 Parsec 安装程序
+          Invoke-WebRequest -Uri "https://builds.parsecgaming.com/package/parsec-windows-arm64.exe" -OutFile "parsec_installer.exe"
+          # 静默安装
+          Start-Process -FilePath ".\parsec_installer.exe" -ArgumentList "/S" -Wait
+          # 删除安装包
+          Remove-Item "parsec_installer.exe"
+
+      # ---------- 安装常用游戏平台（可选） ----------
+      - name: 安装 Steam（如果玩 Steam 游戏）
+        run: |
+          Invoke-WebRequest -Uri "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe" -OutFile "SteamSetup.exe"
+          Start-Process -FilePath ".\SteamSetup.exe" -ArgumentList "/S" -Wait
+          Remove-Item "SteamSetup.exe"
+
+      # 可以在这里添加其他平台的安装（Epic、GOG 等）
+
+      # ---------- 下载 ngrok（用于 RDP 内网穿透） ----------
+      - name: 下载 ngrok
+        run: |
+          Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-arm64.zip" -OutFile "ngrok.zip"
+          Expand-Archive -Path ngrok.zip -DestinationPath .
+          Remove-Item ngrok.zip
+
+      # ---------- 启动 ngrok（映射 RDP 端口） ----------
+      - name: 启动 ngrok（RDP 隧道）
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          if ($env:NGROK_AUTH_TOKEN) {
+            .\ngrok config add-authtoken $env:NGROK_AUTH_TOKEN
+          }
+          Start-Process -NoNewWindow .\ngrok -ArgumentList "tcp 3389"
+          # 等待 ngrok 启动
+          Start-Sleep -Seconds 5
+
+      # ---------- 启动 Parsec 服务 ----------
+      - name: 启动 Parsec 服务（可选）
+        run: |
+          # Parsec 安装后默认会开机自启，这里手动启动确保运行
+          Start-Service -Name "Parsec" -ErrorAction SilentlyContinue
+          # 显示 Parsec 的 peer ID（用于连接）
+          Start-Sleep -Seconds 2
+          $parsecPath = "$env:LOCALAPPDATA\Parsec\parsec.exe"
+          if (Test-Path $parsecPath) {
+            & $parsecPath --get-peer-id | Out-String | Write-Host
+          }
+
+      # ---------- 显示连接信息 ----------
+      - name: 显示连接信息
+        run: |
+          Write-Host "===================================================="
+          Write-Host "RDP 连接信息："
+          Write-Host "  用户名：$env:USERNAME"
+          Write-Host "  密码：YourGamePass123!"
+          # 获取 ngrok RDP 地址
+          $ngrokApi = "http://127.0.0.1:4040/api/tunnels"
+          try {
+            $tunnels = Invoke-RestMethod -Uri $ngrokApi
+            $tcp = $tunnels.tunnels | Where-Object { $_.proto -eq "tcp" }
+            if ($tcp) {
+              $addr = $tcp.public_url -replace "tcp://", ""
+              Write-Host "  RDP 地址：$addr" -ForegroundColor Green
+            }
+          } catch {
+            Write-Host "  RDP 地址：无法获取，请稍后查看 ngrok 日志" -ForegroundColor Yellow
+          }
+
+          Write-Host "----------------------------------------------------"
+          Write-Host "Parsec 连接说明："
+          Write-Host "  1. 在你的本地电脑安装 Parsec"
+          Write-Host "  2. 登录同一个 Parsec 账号"
+          Write-Host "  3. 在 Parsec 客户端中可以看到这台机器（名称类似 GITHUB-ACTIONS）"
+          Write-Host "  4. 点击连接即可获得更流畅的游戏画面"
+          Write-Host "----------------------------------------------------"
+          Write-Host "注意：虚拟机将在 6 小时后自动关闭！"
+          Write-Host "===================================================="
+
+      # ---------- 保持运行（防止退出） ----------
+      - name: 保持活跃
+        run: |
+          while ($true) {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] 虚拟机运行中，可通过 RDP 或 Parsec 连接"
+            Start-Sleep -Seconds 300
+          }
