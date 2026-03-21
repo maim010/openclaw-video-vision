@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: 显示系统信息
         run: systeminfo
-
+      
       # ---------- 启用 RDP（备用）----------
       - name: 启用 RDP
         run: |
@@ -19,12 +19,9 @@ jobs:
           Set-LocalUser -Name $env:USERNAME -Password $password
 
       # ---------- 下载 Sunshine ----------
-      - name: 安装 Sunshine
+      - name: 下载 Sunshine
         run: |
-          # 下载 Sunshine 安装包（ARM64 版本）
-          Invoke-WebRequest -Uri "https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-windows-arm64.zip" -OutFile "sunshine.zip"
-          Expand-Archive -Path sunshine.zip -DestinationPath "C:\Sunshine"
-          Remove-Item sunshine.zip
+          Invoke-WebRequest -Uri "https://github.com/LizardByte/Sunshine/releases/download/v2025.923.33222/Sunshine-Windows-Installer.exe" -OutFile "sunshine_installer.exe"
           # 添加防火墙规则
           netsh advfirewall firewall add rule name="Sunshine" dir=in action=allow protocol=TCP localport=47984,47989,48010
           netsh advfirewall firewall add rule name="Sunshine UDP" dir=in action=allow protocol=UDP localport=47998,47999,48000,48002,48010
